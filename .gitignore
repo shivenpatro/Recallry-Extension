@@ -1,0 +1,27 @@
+# Dependencies and generated output
+node_modules/
+dist/
+coverage/
+.vite/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Logs and local tooling output
+*.log
+test-results/
+playwright-report/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

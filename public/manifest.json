@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "Linkscape",
+  "description": "A premium, local-first visual collection manager for the modern web.",
+  "version": "1.0.0",
+  "minimum_chrome_version": "114",
+  "action": {
+    "default_title": "Linkscape",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "options_page": "dashboard.html",
+  "permissions": ["contextMenus", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "commands": {
+    "save-current-page": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "Save current page to Linkscape"
+    },
+    "open-search": {
+      "suggested_key": {
+        "default": "Ctrl+K",
+        "mac": "Command+K"
+      },
+      "description": "Open Linkscape search"
+    },
+    "lock-vault": {
+      "suggested_key": {
+        "default": "Ctrl+L",
+        "mac": "Command+L"
+      },
+      "description": "Lock Linkscape vault"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
