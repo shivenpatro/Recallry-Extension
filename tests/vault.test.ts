@@ -9,6 +9,10 @@ describe('vault service', () => {
     await db.open();
   });
 
+  it('rejects weak new master passwords', async () => {
+    await expect(createVault('short', 5)).rejects.toThrow('at least 8 characters');
+  });
+
   it('encrypts and decrypts text after unlocking', async () => {
     await expect(createVault('correct horse battery staple', 5)).resolves.toMatchObject({ passwordKdf: 'pbkdf2' });
     const encrypted = await encryptText('private note');

@@ -1,13 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowRight, Check, ExternalLink, FolderPlus, Plus, Save, Search } from 'lucide-react';
+import { ArrowRight, Check, ExternalLink, FolderPlus, Plus, RotateCcw, Save, Search } from 'lucide-react';
 import '../styles/global.css';
 import { Button } from '../components/Button';
 import { IconGlyph } from '../components/IconGlyph';
-import { listCollections, saveCapturedLink, createCollection } from '../data/repositories';
+import {
+  createCollection,
+  findDuplicateLink,
+  listCollections,
+  listRecentCollectionIds,
+  saveCapturedLink,
+  undoRecentlySavedLink
+} from '../data/repositories';
 import type { Collection, LinkCapture } from '../shared/types';
 import { captureActiveTab } from '../services/capture';
-import { safeDomain } from '../shared/utils';
+import { isVaultUnlocked, restoreVaultSession } from '../services/vault';
 
 export function PopupApp() {
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -16,51 +23,96 @@ export function PopupApp() {
   const [notes, setNotes] = useState('');
   const [tags, setTags] = useState('');
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const activeCollections = useMemo(() => collections.filter((collection) => collection.status === 'active'), [collections]);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [duplicateTitle, setDuplicateTitle] = useState('');
+  const [recentCollectionIds, setRecentCollectionIds] = useState<string[]>([]);
+  const [lastSavedLinkId, setLastSavedLinkId] = useState('');
+  const [saveSnapshot, setSaveSnapshot] = useState(false);
+  const activeCollections = useMemo(() => collections.filter((collection) => collection.status === 'active' && (!collection.isVaultProtected || isVaultUnlocked())), [collections]);
+  const orderedCollections = useMemo(() => {
+    const recentOrder = new Map(recentCollectionIds.map((id, index) => [id, index]));
+    return [...activeCollections].sort((left, right) => {
+      const leftRecent = recentOrder.get(left.id);
+      const rightRecent = recentOrder.get(right.id);
+      if (leftRecent !== undefined || rightRecent !== undefined) return (leftRecent ?? Number.MAX_SAFE_INTEGER) - (rightRecent ?? Number.MAX_SAFE_INTEGER);
+      if (left.isPinned !== right.isPinned) return left.isPinned ? -1 : 1;
+      return left.order - right.order;
+    });
+  }, [activeCollections, recentCollectionIds]);
+  const parsedTags = useMemo(() => tags.split(',').map((tag) => tag.trim().toLocaleLowerCase()).filter(Boolean), [tags]);
 
   useEffect(() => {
-    void Promise.all([listCollections(), captureActiveTab()])
-      .then(([nextCollections, nextCapture]) => {
+    void restoreVaultSession().then(() => Promise.all([listCollections(), captureActiveTab(), listRecentCollectionIds()]))
+      .then(([nextCollections, nextCapture, nextRecentIds]) => {
         setCollections(nextCollections);
         setCapture(nextCapture);
-        setSelectedCollectionId(nextCollections[0]?.id ?? '');
+        setRecentCollectionIds(nextRecentIds);
+        setSelectedCollectionId(nextRecentIds.find((id) => nextCollections.some((collection) => collection.id === id)) ?? nextCollections[0]?.id ?? '');
       })
-      .catch(() => {
-        setCapture({
-          title: 'Current page',
-          url: 'https://example.com',
-          domain: safeDomain('https://example.com')
-        });
+      .catch((error) => {
+        setStatus('error');
+        setErrorMessage(error instanceof Error ? error.message : 'The current page cannot be captured');
       });
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (!capture || !selectedCollectionId || lastSavedLinkId) {
+      setDuplicateTitle('');
+      return () => { active = false; };
+    }
+    void findDuplicateLink(selectedCollectionId, capture.url)
+      .then((duplicate) => {
+        if (active) setDuplicateTitle(duplicate?.title ?? '');
+      })
+      .catch(() => {
+        if (active) setDuplicateTitle('');
+      });
+    return () => { active = false; };
+  }, [capture, lastSavedLinkId, selectedCollectionId]);
 
   async function save() {
     if (!capture || !selectedCollectionId) return;
     setStatus('saving');
+    setErrorMessage('');
     try {
-      await saveCapturedLink(
-        selectedCollectionId,
-        capture,
-        notes,
-        tags
-          .split(',')
-          .map((tag) => tag.trim().toLocaleLowerCase())
-          .filter(Boolean)
-      );
+      const captureToSave = saveSnapshot ? await captureActiveTab(true) : capture;
+      const link = await saveCapturedLink(selectedCollectionId, captureToSave, notes, parsedTags);
+      setLastSavedLinkId(link.id);
+      setRecentCollectionIds(await listRecentCollectionIds());
       setStatus('saved');
-    } catch {
+    } catch (error) {
       setStatus('error');
+      setErrorMessage(error instanceof Error ? error.message : 'The page could not be saved');
     }
   }
 
   async function saveToNewCollection() {
     const title = prompt('New collection name');
     if (!title?.trim() || !capture) return;
-    const collection = await createCollection({ title: title.trim() });
-    setCollections(await listCollections());
-    setSelectedCollectionId(collection.id);
-    await saveCapturedLink(collection.id, capture, notes);
-    setStatus('saved');
+    setStatus('saving');
+    setErrorMessage('');
+    try {
+      const collection = await createCollection({ title: title.trim() });
+      const captureToSave = saveSnapshot ? await captureActiveTab(true) : capture;
+      const link = await saveCapturedLink(collection.id, captureToSave, notes, parsedTags);
+      setCollections(await listCollections());
+      setSelectedCollectionId(collection.id);
+      setLastSavedLinkId(link.id);
+      setRecentCollectionIds(await listRecentCollectionIds());
+      setStatus('saved');
+      void chrome?.runtime?.sendMessage?.({ type: 'LINKSCAPE_REFRESH_CONTEXT_MENUS' });
+    } catch (error) {
+      setStatus('error');
+      setErrorMessage(error instanceof Error ? error.message : 'The collection could not be created');
+    }
+  }
+
+  async function undoSave() {
+    if (!lastSavedLinkId) return;
+    await undoRecentlySavedLink(lastSavedLinkId);
+    setLastSavedLinkId('');
+    setStatus('idle');
   }
 
   function openDashboard() {
@@ -105,7 +157,7 @@ export function PopupApp() {
             value={selectedCollectionId}
             onChange={(event) => setSelectedCollectionId(event.target.value)}
           >
-            {activeCollections.map((collection) => (
+            {orderedCollections.map((collection) => (
               <option key={collection.id} value={collection.id}>
                 {collection.title}
               </option>
@@ -129,13 +181,17 @@ export function PopupApp() {
             onChange={(event) => setTags(event.target.value)}
           />
         </div>
+        <label className="flex items-center gap-3 border border-ink bg-paper-soft px-3 py-2.5 text-xs font-semibold text-ink">
+          <input className="h-4 w-4 accent-vermillion" type="checkbox" checked={saveSnapshot} onChange={(event) => setSaveSnapshot(event.target.checked)} />
+          Save a private offline reading snapshot
+        </label>
       </div>
 
       {/* Actions */}
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <Button className="col-span-2" onClick={save} disabled={!capture || !selectedCollectionId || status === 'saving'}>
+        <Button className="col-span-2" onClick={save} disabled={!capture || !selectedCollectionId || status === 'saving' || Boolean(duplicateTitle)}>
           {status === 'saved' ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-          {status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved' : 'Save Current Page'}
+          {status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved' : duplicateTitle ? 'Already Saved' : 'Save Current Page'}
         </Button>
         <Button variant="ghost" onClick={saveToNewCollection}>
           <FolderPlus className="h-4 w-4" />
@@ -146,15 +202,22 @@ export function PopupApp() {
           <ArrowRight className="h-4 w-4" />
         </Button>
       </div>
+      {duplicateTitle ? <p className="mt-3 border-l-2 border-ink pl-3 text-xs leading-5 text-ink-soft" role="status">Already saved as <strong>{duplicateTitle}</strong> in this collection.</p> : null}
+      {errorMessage ? <p className="mt-3 border-l-2 border-vermillion pl-3 text-xs leading-5 text-vermillion" role="alert">{errorMessage}</p> : null}
+      {status === 'saved' && lastSavedLinkId ? (
+        <button className="mt-3 flex items-center gap-2 text-xs font-semibold uppercase text-ink underline-offset-4 hover:underline" onClick={undoSave}>
+          <RotateCcw className="h-3.5 w-3.5" /> Undo save
+        </button>
+      ) : null}
 
       {/* Pinned spaces */}
       <div className="mt-4 space-y-1">
         <div className="flex items-center justify-between border-b border-slate-rule px-1 pb-2">
-          <span className="editorial-index text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-soft/50">Pinned spaces</span>
+          <span className="editorial-index text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-soft/50">Recent &amp; pinned</span>
           <Plus className="h-3.5 w-3.5 text-ink-soft/40" />
         </div>
         <AnimatePresence>
-          {activeCollections.slice(0, 4).map((collection, i) => (
+          {orderedCollections.filter((collection) => collection.isPinned || recentCollectionIds.includes(collection.id)).slice(0, 4).map((collection, i) => (
             <motion.button
               key={collection.id}
               initial={{ opacity: 0, x: -8 }}

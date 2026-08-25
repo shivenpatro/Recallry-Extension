@@ -6,14 +6,13 @@ export default defineConfig({
   plugins: [react()],
   build: {
     emptyOutDir: true,
-    sourcemap: true,
+    sourcemap: false,
     rollupOptions: {
       input: {
         popup: resolve(__dirname, 'popup.html'),
         dashboard: resolve(__dirname, 'dashboard.html'),
-        options: resolve(__dirname, 'options.html'),
-        background: resolve(__dirname, 'src/extension/background.ts'),
-        content: resolve(__dirname, 'src/extension/content.ts')
+        snapshot: resolve(__dirname, 'snapshot.html'),
+        background: resolve(__dirname, 'src/extension/background.ts')
       },
       output: {
         entryFileNames: '[name].js',

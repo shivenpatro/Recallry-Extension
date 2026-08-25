@@ -1,5 +1,5 @@
 import { db, getVaultSettings, setVaultSettings } from '../data/db';
-import type { EncryptedPayload, LinkCard, VaultSettings } from '../shared/types';
+import type { Collection, EncryptedPayload, LinkCard, VaultSettings } from '../shared/types';
 import { nowIso } from '../shared/utils';
 import { VAULT_ITERATIONS } from '../shared/constants';
 
@@ -8,6 +8,56 @@ const decoder = new TextDecoder();
 
 let activeVaultKey: CryptoKey | null = null;
 let autoLockTimer: ReturnType<typeof setTimeout> | null = null;
+let lastActivityRefresh = 0;
+const VAULT_SESSION_KEY = 'linkscapeVaultSession';
+
+interface VaultSessionRecord {
+  key: string;
+  expiresAt: number;
+}
+
+function sessionStorageApi() {
+  return (globalThis as { chrome?: typeof chrome }).chrome?.storage?.session;
+}
+
+async function persistVaultSession(key: CryptoKey, minutes: number) {
+  const storage = sessionStorageApi();
+  if (!storage) return;
+  const rawKey = bytesToBase64(await exportVaultDataKey(key));
+  await storage.set({
+    [VAULT_SESSION_KEY]: {
+      key: rawKey,
+      expiresAt: Date.now() + minutes * 60 * 1000
+    } satisfies VaultSessionRecord
+  });
+}
+
+async function clearVaultSession() {
+  await sessionStorageApi()?.remove(VAULT_SESSION_KEY);
+}
+
+export async function restoreVaultSession() {
+  if (activeVaultKey) return true;
+  const storage = sessionStorageApi();
+  if (!storage) return false;
+  const stored = (await storage.get(VAULT_SESSION_KEY))[VAULT_SESSION_KEY] as VaultSessionRecord | undefined;
+  if (!stored?.key || !Number.isFinite(stored.expiresAt) || stored.expiresAt <= Date.now()) {
+    await storage.remove(VAULT_SESSION_KEY);
+    return false;
+  }
+  activeVaultKey = await importVaultDataKey(base64ToBytes(stored.key));
+  scheduleAutoLock(Math.max((stored.expiresAt - Date.now()) / 60_000, 0));
+  return true;
+}
+
+export async function touchVaultSession() {
+  await restoreVaultSession();
+  if (!activeVaultKey || Date.now() - lastActivityRefresh < 15_000) return;
+  const settings = await getVaultSettings();
+  lastActivityRefresh = Date.now();
+  scheduleAutoLock(settings.autoLockMinutes);
+  await persistVaultSession(activeVaultKey, settings.autoLockMinutes);
+}
 
 function bytesToBase64(bytes: Uint8Array) {
   let binary = '';
@@ -75,7 +125,7 @@ async function exportVaultDataKey(key: CryptoKey) {
 }
 
 async function importVaultDataKey(value: Uint8Array) {
-  return crypto.subtle.importKey('raw', asArrayBuffer(value), { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  return crypto.subtle.importKey('raw', asArrayBuffer(value), { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
 }
 
 async function encryptWithKey(value: string, key: CryptoKey): Promise<EncryptedPayload> {
@@ -109,6 +159,7 @@ function validateAutoLockMinutes(value: number) {
 
 export async function createVault(password: string, autoLockMinutes = 15, recoveryQuestion = '', recoveryAnswer = ''): Promise<VaultSettings> {
   if (!password.trim()) throw new Error('Master password is required');
+  if (password.length < 8) throw new Error('Master password must be at least 8 characters');
   validateAutoLockMinutes(autoLockMinutes);
   if ((recoveryQuestion.trim() && !recoveryAnswer.trim()) || (!recoveryQuestion.trim() && recoveryAnswer.trim())) {
     throw new Error('Enter both a recovery question and answer');
@@ -142,11 +193,13 @@ export async function createVault(password: string, autoLockMinutes = 15, recove
     const passwordKey = await deriveKey(password, salt, settings.iterations);
     const normalizedAnswer = normalizeRecoveryAnswer(recoveryAnswer);
     const recoveryKey = await deriveKey(normalizedAnswer, base64ToBytes(settings.recoverySalt), settings.iterations);
-    settings.recoveryAnswerHash = await sha256Base64(`${normalizedAnswer}:${settings.recoverySalt}`);
+    settings.recoveryAnswerHash = await pbkdf2Verifier(normalizedAnswer, base64ToBytes(settings.recoverySalt), settings.iterations);
+    settings.recoveryKdf = 'pbkdf2';
     settings.passwordWrappedKey = await encryptWithKey(rawDataKey, passwordKey);
     settings.recoveryWrappedKey = await encryptWithKey(rawDataKey, recoveryKey);
   }
   await setVaultSettings(settings);
+  await persistVaultSession(dataKey, autoLockMinutes);
   scheduleAutoLock(autoLockMinutes);
   return settings;
 }
@@ -170,6 +223,7 @@ export async function unlockVault(password: string) {
     activeVaultKey = await deriveKey(password, base64ToBytes(settings.salt), settings.iterations, true);
   }
   await setVaultSettings({ ...settings, lockedAt: undefined, updatedAt: nowIso() });
+  await persistVaultSession(activeVaultKey, settings.autoLockMinutes);
   scheduleAutoLock(settings.autoLockMinutes);
   return true;
 }
@@ -182,6 +236,7 @@ export async function updateVaultAutoLock(autoLockMinutes: number) {
   const nextSettings = { ...settings, autoLockMinutes, updatedAt: nowIso() };
   await setVaultSettings(nextSettings);
   if (activeVaultKey) scheduleAutoLock(autoLockMinutes);
+  if (activeVaultKey) await persistVaultSession(activeVaultKey, autoLockMinutes);
   return nextSettings;
 }
 
@@ -204,7 +259,8 @@ export async function configureVaultRecovery(currentPassword: string, recoveryQu
     passwordKdf: 'pbkdf2',
     recoveryQuestion: recoveryQuestion.trim(),
     recoverySalt: bytesToBase64(recoverySalt),
-    recoveryAnswerHash: await sha256Base64(`${normalizedAnswer}:${bytesToBase64(recoverySalt)}`),
+    recoveryAnswerHash: await pbkdf2Verifier(normalizedAnswer, recoverySalt, settings.iterations),
+    recoveryKdf: 'pbkdf2',
     passwordWrappedKey: await encryptWithKey(rawDataKey, passwordKey),
     recoveryWrappedKey: await encryptWithKey(rawDataKey, recoveryKey),
     lockedAt: undefined,
@@ -214,12 +270,15 @@ export async function configureVaultRecovery(currentPassword: string, recoveryQu
 
 export async function resetVaultPassword(recoveryAnswer: string, newPassword: string) {
   if (!newPassword.trim()) throw new Error('New master password is required');
+  if (newPassword.length < 8) throw new Error('New master password must be at least 8 characters');
   const settings = await getVaultSettings();
   if (!settings.enabled || settings.version !== 2 || !settings.recoverySalt || !settings.recoveryAnswerHash || !settings.recoveryWrappedKey) {
     throw new Error('Recovery is not configured for this Vault');
   }
   const normalizedAnswer = normalizeRecoveryAnswer(recoveryAnswer);
-  const attemptedHash = await sha256Base64(`${normalizedAnswer}:${settings.recoverySalt}`);
+  const attemptedHash = settings.recoveryKdf === 'pbkdf2'
+    ? await pbkdf2Verifier(normalizedAnswer, base64ToBytes(settings.recoverySalt), settings.iterations)
+    : await sha256Base64(`${normalizedAnswer}:${settings.recoverySalt}`);
   if (attemptedHash !== settings.recoveryAnswerHash) throw new Error('Incorrect recovery answer');
 
   const recoveryKey = await deriveKey(normalizedAnswer, base64ToBytes(settings.recoverySalt), settings.iterations);
@@ -239,11 +298,13 @@ export async function resetVaultPassword(recoveryAnswer: string, newPassword: st
   };
   await setVaultSettings(nextSettings);
   activeVaultKey = dataKey;
+  await persistVaultSession(dataKey, settings.autoLockMinutes);
   scheduleAutoLock(settings.autoLockMinutes);
 }
 
 export async function lockVault() {
   activeVaultKey = null;
+  await clearVaultSession();
   if (autoLockTimer) globalThis.clearTimeout(autoLockTimer);
   autoLockTimer = null;
   const settings = await getVaultSettings();
@@ -272,6 +333,7 @@ export async function resetVault() {
   });
 
   activeVaultKey = null;
+  await clearVaultSession();
   if (autoLockTimer) globalThis.clearTimeout(autoLockTimer);
   autoLockTimer = null;
   if (typeof globalThis.dispatchEvent === 'function') globalThis.dispatchEvent(new Event('linkscape-vault-locked'));
@@ -283,11 +345,13 @@ export function isVaultUnlocked() {
 }
 
 export async function encryptText(value: string): Promise<EncryptedPayload> {
+  await restoreVaultSession();
   if (!activeVaultKey) throw new Error('Vault is locked');
   const settings = await getVaultSettings();
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: asArrayBuffer(iv) }, activeVaultKey, encoder.encode(value));
   scheduleAutoLock(settings.autoLockMinutes);
+  await persistVaultSession(activeVaultKey, settings.autoLockMinutes);
   return {
     iv: bytesToBase64(iv),
     salt: settings.salt ?? '',
@@ -296,6 +360,7 @@ export async function encryptText(value: string): Promise<EncryptedPayload> {
 }
 
 export async function decryptText(payload: EncryptedPayload) {
+  await restoreVaultSession();
   if (!activeVaultKey) throw new Error('Vault is locked');
   const decrypted = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: asArrayBuffer(base64ToBytes(payload.iv)) },
@@ -304,6 +369,7 @@ export async function decryptText(payload: EncryptedPayload) {
   );
   const settings = await getVaultSettings();
   scheduleAutoLock(settings.autoLockMinutes);
+  await persistVaultSession(activeVaultKey, settings.autoLockMinutes);
   return decoder.decode(decrypted);
 }
 
@@ -314,7 +380,11 @@ export async function encryptLink(link: LinkCard): Promise<LinkCard> {
     notes: link.notes,
     tags: link.tags,
     labels: link.labels,
-    thumbnailUrl: link.thumbnailUrl
+    thumbnailUrl: link.thumbnailUrl,
+    snapshotHtml: link.snapshotHtml,
+    snapshotCapturedAt: link.snapshotCapturedAt,
+    domain: link.domain,
+    faviconUrl: link.faviconUrl
   });
   const encryptedPayload = await encryptText(protectedFields);
   return {
@@ -325,9 +395,37 @@ export async function encryptLink(link: LinkCard): Promise<LinkCard> {
     tags: [],
     labels: [],
     thumbnailUrl: undefined,
+    snapshotHtml: undefined,
+    snapshotCapturedAt: undefined,
+    domain: 'protected',
+    faviconUrl: undefined,
     isVaultProtected: true,
     encryptedPayload
   };
+}
+
+export async function encryptCollection(collection: Collection): Promise<Collection> {
+  const encryptedMetadata = await encryptText(JSON.stringify({
+    title: collection.title,
+    description: collection.description,
+    icon: collection.icon,
+    theme: collection.theme
+  }));
+  return {
+    ...collection,
+    title: 'Locked Collection',
+    description: '',
+    icon: 'Lock',
+    theme: 'mono',
+    isVaultProtected: true,
+    encryptedMetadata
+  };
+}
+
+export async function decryptCollection(collection: Collection): Promise<Collection> {
+  if (!collection.encryptedMetadata) return collection;
+  const decrypted = JSON.parse(await decryptText(collection.encryptedMetadata)) as Partial<Collection>;
+  return { ...collection, ...decrypted, isVaultProtected: true };
 }
 
 export async function decryptLink(link: LinkCard): Promise<LinkCard> {
@@ -339,3 +437,17 @@ export async function decryptLink(link: LinkCard): Promise<LinkCard> {
     isVaultProtected: true
   };
 }
+
+const extensionApi = (globalThis as { chrome?: typeof chrome }).chrome;
+extensionApi?.storage?.onChanged?.addListener((changes, areaName) => {
+  if (areaName !== 'session' || !changes[VAULT_SESSION_KEY]) return;
+  const next = changes[VAULT_SESSION_KEY].newValue as VaultSessionRecord | undefined;
+  if (next?.expiresAt && next.expiresAt > Date.now()) {
+    if (activeVaultKey) scheduleAutoLock((next.expiresAt - Date.now()) / 60_000);
+    return;
+  }
+  activeVaultKey = null;
+  if (autoLockTimer) globalThis.clearTimeout(autoLockTimer);
+  autoLockTimer = null;
+  if (typeof globalThis.dispatchEvent === 'function') globalThis.dispatchEvent(new Event('linkscape-vault-locked'));
+});

@@ -1,0 +1,170 @@
+import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+
+const edgeCandidates = [
+  'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+  'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
+];
+const edge = edgeCandidates.find(existsSync);
+if (!edge) throw new Error('Microsoft Edge was not found');
+
+const extensionPath = resolve('dist');
+const profilePath = join(tmpdir(), `linkscape-edge-smoke-${process.pid}`);
+const port = 9333 + Math.floor(Math.random() * 300);
+const browser = spawn(edge, [
+  '--headless=new',
+  `--remote-debugging-port=${port}`,
+  `--user-data-dir=${profilePath}`,
+  `--disable-extensions-except=${extensionPath}`,
+  `--load-extension=${extensionPath}`,
+  '--no-first-run',
+  '--no-default-browser-check',
+  'about:blank'
+], { stdio: 'ignore', windowsHide: true });
+
+try {
+  const version = await pollJson(`http://127.0.0.1:${port}/json/version`);
+  const cdp = await connectCdp(version.webSocketDebuggerUrl);
+  let worker;
+  for (let attempt = 0; attempt < 40 && !worker; attempt += 1) {
+    const targets = await cdp.send('Target.getTargets');
+    worker = targets.targetInfos.find((target) => target.type === 'service_worker' && target.url.startsWith('chrome-extension://'));
+    if (!worker) await delay(250);
+  }
+  if (!worker) throw new Error('Linkscape service worker did not start');
+  const extensionId = new URL(worker.url).hostname;
+  const workerSession = await cdp.send('Target.attachToTarget', { targetId: worker.targetId, flatten: true });
+  await cdp.send('Runtime.enable', {}, workerSession.sessionId);
+  await cdp.send('Log.enable', {}, workerSession.sessionId);
+
+  const dashboard = await openTarget(cdp, `chrome-extension://${extensionId}/dashboard.html`);
+  await waitForText(cdp, dashboard, 'Collections');
+  const initialText = await bodyText(cdp, dashboard);
+  for (const label of ['Collections', 'Favorites', 'Archived', 'Trash', 'Vault', 'Settings']) {
+    if (!initialText.includes(label)) throw new Error(`Dashboard is missing ${label}`);
+  }
+
+  await clickButton(cdp, dashboard, 'Trash');
+  await waitForText(cdp, dashboard, 'Trash is empty');
+  await clickButton(cdp, dashboard, 'Settings');
+  await waitForText(cdp, dashboard, 'Recovery Points');
+  const settingsText = await bodyText(cdp, dashboard);
+  for (const label of ['Link Health', 'Privacy', 'Recovery Points']) {
+    if (!settingsText.includes(label)) throw new Error(`Settings is missing ${label}`);
+  }
+
+  await cdp.send('Runtime.evaluate', {
+    expression: "window.dispatchEvent(new KeyboardEvent('keydown',{key:'k',ctrlKey:true,bubbles:true}))"
+  }, dashboard);
+  await waitForText(cdp, dashboard, 'Everything');
+
+  const snapshot = await openTarget(cdp, `chrome-extension://${extensionId}/snapshot.html`);
+  await waitForText(cdp, snapshot, 'Snapshot link is missing.');
+
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true }, dashboard);
+  await delay(250);
+  const mobileLayout = await cdp.send('Runtime.evaluate', {
+    expression: '({scrollWidth:document.documentElement.scrollWidth,viewport:innerWidth,text:document.body.innerText})',
+    returnByValue: true
+  }, dashboard);
+  if (mobileLayout.result.value.scrollWidth > mobileLayout.result.value.viewport + 1) throw new Error('Dashboard overflows horizontally at 390px');
+  if (!mobileLayout.result.value.text.includes('Settings')) throw new Error('Mobile navigation did not render');
+
+  const targets = await cdp.send('Target.getTargets');
+  const errors = targets.targetInfos.filter((target) => target.type === 'page' && target.url.startsWith('chrome-extension://') && target.title.toLocaleLowerCase().includes('error'));
+  if (errors.length) throw new Error(`Edge reported ${errors.length} extension error page(s)`);
+  const runtimeErrors = cdp.events.filter((event) => event.method === 'Runtime.exceptionThrown' || (event.method === 'Log.entryAdded' && event.params?.entry?.level === 'error'));
+  if (runtimeErrors.length) throw new Error(`Edge captured ${runtimeErrors.length} extension runtime error(s): ${JSON.stringify(runtimeErrors.slice(0, 3))}`);
+  console.log(JSON.stringify({ ok: true, extensionId, checks: ['service-worker', 'dashboard', 'trash', 'settings', 'spotlight', 'snapshot', 'mobile-390px', 'runtime-errors'] }));
+  await cdp.send('Browser.close');
+} finally {
+  if (!browser.killed) browser.kill();
+  if (profilePath.startsWith(tmpdir()) && profilePath.includes('linkscape-edge-smoke-')) await rm(profilePath, { recursive: true, force: true }).catch(() => undefined);
+}
+
+async function openTarget(cdp, url) {
+  const { targetId } = await cdp.send('Target.createTarget', { url });
+  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
+  await cdp.send('Runtime.enable', {}, sessionId);
+  await cdp.send('Page.enable', {}, sessionId);
+  await cdp.send('Log.enable', {}, sessionId);
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId);
+  return sessionId;
+}
+
+async function clickButton(cdp, sessionId, label) {
+  const expression = `(() => { const button = [...document.querySelectorAll('button')].find((element) => element.textContent.trim() === ${JSON.stringify(label)}); if (!button) return false; button.click(); return true; })()`;
+  const result = await cdp.send('Runtime.evaluate', { expression, returnByValue: true }, sessionId);
+  if (!result.result.value) throw new Error(`Could not click ${label}`);
+  await delay(250);
+}
+
+async function waitForText(cdp, sessionId, expected) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    if ((await bodyText(cdp, sessionId)).includes(expected)) return;
+    await delay(200);
+  }
+  const state = await cdp.send('Runtime.evaluate', {
+    expression: '({url:location.href,readyState:document.readyState,title:document.title,text:document.body?.innerText ?? "",html:document.documentElement?.outerHTML?.slice(0,1200) ?? ""})',
+    returnByValue: true
+  }, sessionId);
+  console.error(JSON.stringify({ expected, state: state.result.value, events: cdp.events.slice(-20) }, null, 2));
+  throw new Error(`Timed out waiting for ${expected}`);
+}
+
+async function bodyText(cdp, sessionId) {
+  const response = await cdp.send('Runtime.evaluate', { expression: 'document.body?.innerText ?? ""', returnByValue: true }, sessionId);
+  return response.result.value ?? '';
+}
+
+async function pollJson(url) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return response.json();
+    } catch {
+      // Edge is still starting.
+    }
+    await delay(250);
+  }
+  throw new Error('Edge DevTools endpoint did not start');
+}
+
+function connectCdp(url) {
+  return new Promise((resolveConnection, rejectConnection) => {
+    const socket = new WebSocket(url);
+    const pending = new Map();
+    const events = [];
+    let nextId = 1;
+    socket.onerror = () => rejectConnection(new Error('Could not connect to Edge DevTools'));
+    socket.onmessage = (event) => {
+      const message = JSON.parse(String(event.data));
+      if (!message.id) {
+        if (message.method === 'Runtime.exceptionThrown' || message.method === 'Runtime.consoleAPICalled' || message.method === 'Log.entryAdded') events.push(message);
+        return;
+      }
+      const request = pending.get(message.id);
+      if (!request) return;
+      pending.delete(message.id);
+      if (message.error) request.reject(new Error(message.error.message));
+      else request.resolve(message.result);
+    };
+    socket.onopen = () => resolveConnection({
+      events,
+      send(method, params = {}, sessionId) {
+        return new Promise((resolveRequest, rejectRequest) => {
+          const id = nextId++;
+          pending.set(id, { resolve: resolveRequest, reject: rejectRequest });
+          socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+        });
+      }
+    });
+  });
+}
+
+function delay(milliseconds) {
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
+}

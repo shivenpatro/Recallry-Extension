@@ -2,15 +2,29 @@ import Fuse from 'fuse.js';
 import type { Collection, LinkCard, SearchResult, SmartCollectionRule } from '../shared/types';
 import { normalizeSearch } from '../shared/utils';
 
+let cachedCollections: Collection[] | undefined;
+let cachedLinks: LinkCard[] | undefined;
+let collectionIndex: Fuse<Collection> | undefined;
+let linkIndex: Fuse<LinkCard> | undefined;
+
+function searchIndexes(collections: Collection[], links: LinkCard[]) {
+  if (collections !== cachedCollections) {
+    cachedCollections = collections;
+    collectionIndex = new Fuse(collections, { keys: ['title', 'description'], threshold: 0.32, includeScore: true });
+  }
+  if (links !== cachedLinks) {
+    cachedLinks = links;
+    linkIndex = new Fuse(links, { keys: ['title', 'url', 'domain', 'notes', 'tags', 'labels'], threshold: 0.34, includeScore: true });
+  }
+  return { collectionIndex: collectionIndex!, linkIndex: linkIndex! };
+}
+
 export function runGlobalSearch(query: string, collections: Collection[], links: LinkCard[]): SearchResult[] {
   const normalized = normalizeSearch(query);
   if (!normalized) return [];
 
-  const collectionResults = new Fuse(collections, {
-    keys: ['title', 'description'],
-    threshold: 0.32,
-    includeScore: true
-  })
+  const indexes = searchIndexes(collections, links);
+  const collectionResults = indexes.collectionIndex
     .search(normalized)
     .map((result) => ({
       id: result.item.id,
@@ -20,11 +34,7 @@ export function runGlobalSearch(query: string, collections: Collection[], links:
       score: result.score
     }));
 
-  const linkResults = new Fuse(links, {
-    keys: ['title', 'url', 'domain', 'notes', 'tags', 'labels'],
-    threshold: 0.34,
-    includeScore: true
-  })
+  const linkResults = indexes.linkIndex
     .search(normalized)
     .map((result) => ({
       id: result.item.id,

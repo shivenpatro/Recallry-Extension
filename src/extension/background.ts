@@ -1,53 +1,49 @@
 import { DEFAULT_COLLECTION_ID } from '../shared/constants';
 import type { LinkCapture, RuntimeMessage } from '../shared/types';
 import { faviconForUrl, safeDomain } from '../shared/utils';
-import { bootstrapRepository, saveCapturedLink } from '../data/repositories';
-import { lockVault } from '../services/vault';
+import { bootstrapRepository, listCollections, saveCapturedLink } from '../data/repositories';
+import { captureActiveTab } from '../services/capture';
+import { isVaultUnlocked, lockVault, restoreVaultSession } from '../services/vault';
+import { ensureFreshAutomaticBackup } from '../services/backups';
 
 const QUICK_SAVE_MENU_ID = 'linkscape-save-page';
+const SAVE_TO_MENU_PREFIX = 'linkscape-save-to:';
 const OPEN_DASHBOARD_MENU_ID = 'linkscape-open-dashboard';
+const AUTOMATIC_BACKUP_ALARM = 'linkscape-automatic-backup';
 
 chrome.runtime.onInstalled.addListener(() => {
-  void bootstrapRepository();
-  chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({
-      id: QUICK_SAVE_MENU_ID,
-      title: 'Save to Linkscape',
-      contexts: ['page', 'link', 'selection']
-    });
-    chrome.contextMenus.create({
-      id: OPEN_DASHBOARD_MENU_ID,
-      title: 'Open Linkscape Dashboard',
-      contexts: ['action']
-    });
-  });
+  void initializeExtension();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  void bootstrapRepository();
+  void initializeExtension();
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === AUTOMATIC_BACKUP_ALARM) void ensureFreshAutomaticBackup();
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === QUICK_SAVE_MENU_ID) {
-    const url = info.linkUrl || tab?.url;
+  if (typeof info.menuItemId === 'string' && info.menuItemId.startsWith(SAVE_TO_MENU_PREFIX)) {
+    const collectionId = decodeURIComponent(info.menuItemId.slice(SAVE_TO_MENU_PREFIX.length));
+    const url = info.linkUrl || info.pageUrl || tab?.url;
     if (!url) return;
-    void saveCapturedLink(DEFAULT_COLLECTION_ID, {
-      title: tab?.title || url,
+    const capture: LinkCapture = {
+      title: info.selectionText?.trim() || tab?.title || url,
       url,
       domain: safeDomain(url),
       faviconUrl: tab?.favIconUrl || faviconForUrl(url)
-    });
+    };
+    void saveCapturedLink(collectionId, capture).then(() => showSaveResult(true)).catch(() => showSaveResult(false));
   }
 
-  if (info.menuItemId === OPEN_DASHBOARD_MENU_ID) {
-    void openDashboard();
-  }
+  if (info.menuItemId === OPEN_DASHBOARD_MENU_ID) void openDashboard();
 });
 
 chrome.commands.onCommand.addListener((command) => {
-  if (command === 'save-current-page') void saveActiveTab();
-  if (command === 'open-search') void openDashboard('#search');
-  if (command === 'lock-vault') void lockVault();
+  if (command === 'save-current-page') void saveActiveTab().then(() => showSaveResult(true)).catch(() => showSaveResult(false));
+  if (command === 'open-search') void openDashboard('?search=1');
+  if (command === 'lock-vault') void lockEverywhere();
 });
 
 chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResponse) => {
@@ -66,31 +62,63 @@ chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResp
   }
 
   if (message.type === 'LINKSCAPE_OPEN_DASHBOARD' || message.type === 'LINKSCAPE_OPEN_SEARCH') {
-    void openDashboard(message.type === 'LINKSCAPE_OPEN_SEARCH' ? '#search' : undefined);
+    void openDashboard(message.type === 'LINKSCAPE_OPEN_SEARCH' ? '?search=1' : undefined);
   }
 
-  if (message.type === 'LINKSCAPE_LOCK_VAULT') {
-    void lockVault().then(() => {
-      void chrome.runtime.sendMessage({ type: 'LINKSCAPE_VAULT_LOCKED' }).catch(() => undefined);
-    });
-  }
-
+  if (message.type === 'LINKSCAPE_LOCK_VAULT') void lockEverywhere();
+  if (message.type === 'LINKSCAPE_REFRESH_CONTEXT_MENUS') void rebuildContextMenus();
   return false;
 });
 
-async function saveActiveTab(collectionId = DEFAULT_COLLECTION_ID) {
+async function initializeExtension() {
+  await chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
   await bootstrapRepository();
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.url) throw new Error('No active tab to save');
-  return saveCapturedLink(collectionId, {
-    title: tab.title || tab.url,
-    url: tab.url,
-    domain: safeDomain(tab.url),
-    faviconUrl: tab.favIconUrl || faviconForUrl(tab.url)
+  await restoreVaultSession();
+  await rebuildContextMenus();
+  await ensureFreshAutomaticBackup();
+  await chrome.alarms.create(AUTOMATIC_BACKUP_ALARM, { periodInMinutes: 24 * 60 });
+}
+
+async function rebuildContextMenus() {
+  const collections = (await listCollections()).filter((collection) => collection.status === 'active' && (!collection.isVaultProtected || isVaultUnlocked()));
+  await chrome.contextMenus.removeAll();
+  chrome.contextMenus.create({
+    id: QUICK_SAVE_MENU_ID,
+    title: 'Save to Linkscape',
+    contexts: ['page', 'link', 'selection']
+  });
+  for (const collection of collections.slice(0, 20)) {
+    chrome.contextMenus.create({
+      id: `${SAVE_TO_MENU_PREFIX}${encodeURIComponent(collection.id)}`,
+      parentId: QUICK_SAVE_MENU_ID,
+      title: collection.title,
+      contexts: ['page', 'link', 'selection']
+    });
+  }
+  chrome.contextMenus.create({
+    id: OPEN_DASHBOARD_MENU_ID,
+    title: 'Open Linkscape Dashboard',
+    contexts: ['action']
   });
 }
 
-async function openDashboard(hash = '') {
-  const url = chrome.runtime.getURL(`dashboard.html${hash}`);
-  await chrome.tabs.create({ url });
+async function saveActiveTab(collectionId = DEFAULT_COLLECTION_ID) {
+  await bootstrapRepository();
+  return saveCapturedLink(collectionId, await captureActiveTab());
+}
+
+async function lockEverywhere() {
+  await lockVault();
+  await rebuildContextMenus();
+  await chrome.runtime.sendMessage({ type: 'LINKSCAPE_VAULT_LOCKED' }).catch(() => undefined);
+}
+
+async function openDashboard(suffix = '') {
+  await chrome.tabs.create({ url: chrome.runtime.getURL(`dashboard.html${suffix}`) });
+}
+
+async function showSaveResult(success: boolean) {
+  await chrome.action.setBadgeBackgroundColor({ color: success ? '#1a1714' : '#e63946' });
+  await chrome.action.setBadgeText({ text: success ? 'OK' : '!' });
+  globalThis.setTimeout(() => void chrome.action.setBadgeText({ text: '' }), 1800);
 }

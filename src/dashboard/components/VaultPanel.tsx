@@ -31,6 +31,7 @@ export function VaultPanel() {
       setPassword('');
       setMessage('Vault ready');
       await refresh();
+      void chrome?.runtime?.sendMessage?.({ type: 'LINKSCAPE_REFRESH_CONTEXT_MENUS' });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Vault action failed');
     }
@@ -40,6 +41,7 @@ export function VaultPanel() {
     await lockVault();
     setMessage('Vault locked');
     await refresh();
+    void chrome?.runtime?.sendMessage?.({ type: 'LINKSCAPE_REFRESH_CONTEXT_MENUS' });
   }
 
   async function handleAutoLockBlur() {
@@ -61,6 +63,7 @@ export function VaultPanel() {
       setShowRecovery(false);
       setMessage('Password reset. Vault unlocked.');
       await refresh();
+      void chrome?.runtime?.sendMessage?.({ type: 'LINKSCAPE_REFRESH_CONTEXT_MENUS' });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Password reset failed');
     }
@@ -90,6 +93,7 @@ export function VaultPanel() {
     const removedCount = await resetVault();
     setMessage(`Vault reset. ${removedCount} locked collection${removedCount === 1 ? '' : 's'} removed.`);
     await refresh();
+    void chrome?.runtime?.sendMessage?.({ type: 'LINKSCAPE_REFRESH_CONTEXT_MENUS' });
   }
 
   return (

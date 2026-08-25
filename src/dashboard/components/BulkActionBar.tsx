@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Archive, Tags, Trash2, X } from 'lucide-react';
+import { Archive, RotateCcw, Tags, Trash2, X } from 'lucide-react';
 import { useLinkscapeStore } from '../../store/linkscapeStore';
 import { Button } from '../../components/Button';
 import { exportLinksAsCsv } from '../../services/importExport';
 import { downloadText } from '../../shared/utils';
+import { isVaultUnlocked } from '../../services/vault';
 
 export function BulkActionBar() {
   const selected = useLinkscapeStore((state) => state.selectedLinkIds);
@@ -12,19 +13,19 @@ export function BulkActionBar() {
   const allLinks = useLinkscapeStore((state) => state.links);
   const clearSelection = useLinkscapeStore((state) => state.clearSelection);
   const deleteSelectedLinks = useLinkscapeStore((state) => state.deleteSelectedLinks);
+  const restoreSelectedLinks = useLinkscapeStore((state) => state.restoreSelectedLinks);
+  const permanentlyDeleteSelectedLinks = useLinkscapeStore((state) => state.permanentlyDeleteSelectedLinks);
   const moveSelectedLinks = useLinkscapeStore((state) => state.moveSelectedLinks);
-  const updateLink = useLinkscapeStore((state) => state.updateLink);
-  const collections = useMemo(() => allCollections.filter((collection) => collection.status === 'active'), [allCollections]);
+  const archiveSelectedLinks = useLinkscapeStore((state) => state.archiveSelectedLinks);
+  const tagSelectedLinks = useLinkscapeStore((state) => state.tagSelectedLinks);
+  const collections = useMemo(() => allCollections.filter((collection) => collection.status === 'active' && (!collection.isVaultProtected || isVaultUnlocked())), [allCollections]);
   const selectedLinks = useMemo(() => allLinks.filter((link) => selected.includes(link.id)), [allLinks, selected]);
+  const selectedAreTrashed = selectedLinks.length > 0 && selectedLinks.every((link) => Boolean(link.deletedAt));
 
   async function tagSelected() {
     const tag = prompt('Tag selected cards');
     if (!tag?.trim()) return;
-    for (const id of selected) {
-      const link = allLinks.find((item) => item.id === id);
-      const normalizedTag = tag.trim().toLocaleLowerCase();
-      if (link) await updateLink(id, { tags: [...new Set([...link.tags, normalizedTag])] });
-    }
+    await tagSelectedLinks(tag);
   }
 
   function exportSelected() {
@@ -44,7 +45,7 @@ export function BulkActionBar() {
             <span className="text-vermillion">{selected.length}</span> selected
           </span>
           <div className="mx-1 h-6 w-px bg-ink/20" />
-          <select
+          {!selectedAreTrashed ? <select
             className="h-9 border border-ink bg-paper px-3 text-xs font-semibold uppercase tracking-wider text-ink outline-none"
             defaultValue=""
             onChange={(event) => {
@@ -60,21 +61,28 @@ export function BulkActionBar() {
                 {collection.title}
               </option>
             ))}
-          </select>
-          <Button variant="ghost" onClick={tagSelected}>
+          </select> : null}
+          {!selectedAreTrashed ? <Button variant="ghost" onClick={tagSelected}>
             <Tags className="h-3.5 w-3.5" />
             Tag
-          </Button>
-          <Button variant="ghost" onClick={exportSelected}>
+          </Button> : null}
+          {!selectedAreTrashed ? <Button variant="ghost" onClick={exportSelected}>
             Export
-          </Button>
-          <Button variant="ghost" onClick={() => void Promise.all(selected.map((id) => updateLink(id, { isArchived: true }))).then(clearSelection)}>
+          </Button> : null}
+          {!selectedAreTrashed ? <Button variant="ghost" onClick={() => void archiveSelectedLinks()}>
             <Archive className="h-3.5 w-3.5" />
             Archive
-          </Button>
-          <Button variant="danger" onClick={() => void deleteSelectedLinks()}>
+          </Button> : null}
+          {selectedAreTrashed ? <Button variant="ghost" onClick={() => void restoreSelectedLinks()}><RotateCcw className="h-3.5 w-3.5" /> Restore</Button> : null}
+          <Button variant="danger" onClick={() => {
+            if (selectedAreTrashed) {
+              if (window.confirm(`Permanently delete ${selected.length} selected ${selected.length === 1 ? 'card' : 'cards'}? This cannot be undone.`)) void permanentlyDeleteSelectedLinks();
+            } else if (window.confirm(`Move ${selected.length} selected ${selected.length === 1 ? 'card' : 'cards'} to Trash?`)) {
+              void deleteSelectedLinks();
+            }
+          }}>
             <Trash2 className="h-3.5 w-3.5" />
-            Delete
+            {selectedAreTrashed ? 'Delete forever' : 'Trash'}
           </Button>
           <button className="grid h-9 w-9 place-items-center text-ink-soft transition hover:bg-ink hover:text-paper" onClick={clearSelection} title="Clear selection">
             <X className="h-4 w-4" />

@@ -19,6 +19,10 @@ coverage/
 *.log
 test-results/
 playwright-report/
+*.crx
+*.zip
+.chrome-profile/
+.edge-profile/
 
 # OS/editor files
 .DS_Store

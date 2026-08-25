@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
 import { Menu } from '@headlessui/react';
-import { Copy, ExternalLink, GripVertical, MoreHorizontal, Pencil, Tags, Trash2 } from 'lucide-react';
+import { Archive, BookOpen, Copy, ExternalLink, FolderInput, GripVertical, MoreHorizontal, Pencil, RotateCcw, Tags, Trash2 } from 'lucide-react';
 import type { LinkCard } from '../../shared/types';
 import { cn } from '../../shared/utils';
 import { useLinkscapeStore } from '../../store/linkscapeStore';
@@ -21,6 +21,10 @@ export function LinkCardItem({ link, selected }: LinkCardItemProps) {
   const updateLink = useLinkscapeStore((state) => state.updateLink);
   const duplicateLink = useLinkscapeStore((state) => state.duplicateLink);
   const deleteLink = useLinkscapeStore((state) => state.deleteLink);
+  const restoreLink = useLinkscapeStore((state) => state.restoreLink);
+  const permanentlyDeleteLink = useLinkscapeStore((state) => state.permanentlyDeleteLink);
+  const moveLink = useLinkscapeStore((state) => state.moveLink);
+  const collections = useLinkscapeStore((state) => state.collections);
   const style = { transform: CSS.Transform.toString(transform), transition };
 
   function openLink() {
@@ -36,6 +40,15 @@ export function LinkCardItem({ link, selected }: LinkCardItemProps) {
     }
   }
 
+  function openSnapshot() {
+    const extensionApi = (globalThis as { chrome?: typeof chrome }).chrome;
+    const url = extensionApi?.runtime?.getURL
+      ? extensionApi.runtime.getURL(`snapshot.html?id=${encodeURIComponent(link.id)}`)
+      : `/snapshot.html?id=${encodeURIComponent(link.id)}`;
+    if (extensionApi?.tabs?.create) void extensionApi.tabs.create({ url });
+    else window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
   async function editNotes() {
     const notes = prompt('Notes', link.notes);
     if (notes === null) return;
@@ -46,6 +59,28 @@ export function LinkCardItem({ link, selected }: LinkCardItemProps) {
     const tags = prompt('Tags separated by commas', link.tags.join(', '));
     if (tags === null) return;
     await updateLink(link.id, { tags: tags.split(',').map((tag) => tag.trim().toLocaleLowerCase()).filter(Boolean) });
+  }
+
+  async function editLabels() {
+    const labels = prompt('Labels separated by commas', link.labels.join(', '));
+    if (labels === null) return;
+    await updateLink(link.id, { labels: labels.split(',').map((label) => label.trim().toLocaleLowerCase()).filter(Boolean) });
+  }
+
+  async function moveCard() {
+    const destinations = collections.filter((collection) => collection.status === 'active' && collection.id !== link.collectionId && (!collection.isVaultProtected || isVaultUnlocked()));
+    if (destinations.length === 0) {
+      window.alert('Create another accessible collection before moving this card.');
+      return;
+    }
+    const choice = prompt(`Move to:\n${destinations.map((collection, index) => `${index + 1}. ${collection.title}`).join('\n')}\n\nEnter a number`);
+    if (choice === null) return;
+    const destination = destinations[Number(choice) - 1];
+    if (!destination) {
+      window.alert('Choose a valid collection number.');
+      return;
+    }
+    await moveLink(link.id, destination.id);
   }
 
   return (
@@ -90,12 +125,21 @@ export function LinkCardItem({ link, selected }: LinkCardItemProps) {
       ) : null}
 
       <div className="p-5">
+        {!link.thumbnailUrl ? (
+          <div className="mb-3 flex items-center justify-between border-b border-slate-rule pb-2">
+            <button className="grid h-7 w-7 cursor-grab place-items-center text-ink-soft/50 transition hover:bg-ink hover:text-paper active:cursor-grabbing" {...listeners} title="Drag">
+              <GripVertical className="h-3.5 w-3.5" />
+            </button>
+            <input className="h-4 w-4 accent-vermillion" type="checkbox" checked={selected} onChange={() => toggle(link.id)} aria-label={`Select ${link.title}`} />
+          </div>
+        ) : null}
         {/* Running head: domain */}
         <div className="flex items-center gap-2 border-b border-slate-rule pb-2">
           {link.faviconUrl ? <img className="h-4 w-4" src={link.faviconUrl} alt="" loading="lazy" /> : null}
           <span className="editorial-index truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-vermillion">
             {link.domain}
           </span>
+          {link.healthStatus ? <span className={cn('ml-auto h-2 w-2', link.healthStatus === 'healthy' ? 'bg-emerald-600' : link.healthStatus === 'broken' ? 'bg-vermillion' : 'bg-ink/30')} title={`Link check: ${link.healthStatus}`} /> : null}
         </div>
 
         <button className="mt-3 block w-full text-left" onClick={() => setExpanded((value) => !value)}>
@@ -129,6 +173,7 @@ export function LinkCardItem({ link, selected }: LinkCardItemProps) {
             <Action title="Open" onClick={openLink}>
               <ExternalLink className="h-3.5 w-3.5" />
             </Action>
+            {link.snapshotHtml ? <Action title="Offline snapshot" onClick={openSnapshot}><BookOpen className="h-3.5 w-3.5" /></Action> : null}
             <Action title="Notes" onClick={editNotes}>
               <Pencil className="h-3.5 w-3.5" />
             </Action>
@@ -139,8 +184,14 @@ export function LinkCardItem({ link, selected }: LinkCardItemProps) {
               <Copy className="h-3.5 w-3.5" />
             </Action>
             <Action
-              title="Delete"
-              onClick={() => void deleteLink(link.id)}
+              title={link.deletedAt ? 'Delete forever' : 'Move to Trash'}
+              onClick={() => {
+                if (link.deletedAt) {
+                  if (window.confirm(`Permanently delete “${link.title}”? This cannot be undone.`)) void permanentlyDeleteLink(link.id);
+                } else if (window.confirm(`Move “${link.title}” to Trash?`)) {
+                  void deleteLink(link.id);
+                }
+              }}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Action>
@@ -158,6 +209,26 @@ export function LinkCardItem({ link, selected }: LinkCardItemProps) {
                       onClick={openLink}
                     >
                       <ExternalLink className="h-3 w-3" /> Open
+                    </button>
+                  )}
+                </Menu.Item>
+                <Menu.Item>
+                  {({ active }) => (
+                    <button
+                      className={cn('flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider transition', active ? 'bg-ink text-paper' : 'text-ink')}
+                      onClick={editLabels}
+                    >
+                      <Tags className="h-3 w-3" /> Labels
+                    </button>
+                  )}
+                </Menu.Item>
+                <Menu.Item>
+                  {({ active }) => (
+                    <button
+                      className={cn('flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider transition', active ? 'bg-ink text-paper' : 'text-ink')}
+                      onClick={() => void moveCard()}
+                    >
+                      <FolderInput className="h-3 w-3" /> Move
                     </button>
                   )}
                 </Menu.Item>
@@ -191,16 +262,31 @@ export function LinkCardItem({ link, selected }: LinkCardItemProps) {
                     </button>
                   )}
                 </Menu.Item>
+                <Menu.Item>
+                  {({ active }) => (
+                    <button
+                      className={cn('flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider transition', active ? 'bg-ink text-paper' : 'text-ink')}
+                      onClick={() => void (link.deletedAt ? restoreLink(link.id) : updateLink(link.id, { isArchived: !link.isArchived }))}
+                    >
+                      {link.isArchived || link.deletedAt ? <RotateCcw className="h-3 w-3" /> : <Archive className="h-3 w-3" />}
+                      {link.isArchived || link.deletedAt ? 'Restore' : 'Archive'}
+                    </button>
+                  )}
+                </Menu.Item>
                 <div className="my-0.5 h-px bg-ink/10" />
                 <Menu.Item>
                   {({ active }) => (
                     <button
                       className={cn('flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider transition', active ? 'bg-vermillion text-paper' : 'text-vermillion')}
                       onClick={() => {
-                        void deleteLink(link.id);
+                        if (link.deletedAt) {
+                          if (window.confirm(`Permanently delete “${link.title}”? This cannot be undone.`)) void permanentlyDeleteLink(link.id);
+                        } else if (window.confirm(`Move “${link.title}” to Trash?`)) {
+                          void deleteLink(link.id);
+                        }
                       }}
                     >
-                      <Trash2 className="h-3 w-3" /> Delete
+                      <Trash2 className="h-3 w-3" /> {link.deletedAt ? 'Delete forever' : 'Move to Trash'}
                     </button>
                   )}
                 </Menu.Item>

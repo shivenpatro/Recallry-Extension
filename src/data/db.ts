@@ -23,6 +23,29 @@ export class LinkscapeDatabase extends Dexie {
       tags: '&id, &name, createdAt',
       meta: '&key'
     });
+
+    this.version(2)
+      .stores({
+        collections: '&id, parentId, order, isPinned, isFavorite, status, updatedAt',
+        links: '&id, collectionId, domain, *tags, order, isArchived, createdAt, updatedAt',
+        tags: '&id, &name, createdAt',
+        meta: '&key'
+      })
+      .upgrade(async (transaction) => {
+        await transaction.table<LinkCard, string>('links').toCollection().modify((link) => {
+          link.tags = Array.isArray(link.tags) ? link.tags : [];
+          link.labels = Array.isArray(link.labels) ? link.labels : [];
+          link.isArchived = Boolean(link.isArchived);
+        });
+      });
+
+    this.version(3)
+      .stores({
+        collections: '&id, parentId, order, isPinned, isFavorite, status, deletedAt, updatedAt',
+        links: '&id, collectionId, domain, *tags, order, isArchived, deletedAt, createdAt, updatedAt',
+        tags: '&id, &name, createdAt',
+        meta: '&key'
+      });
   }
 }
 

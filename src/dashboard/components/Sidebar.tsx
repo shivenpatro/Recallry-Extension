@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Archive, Boxes, Heart, Lock, Plus, Settings } from 'lucide-react';
+import { Archive, Boxes, Heart, Lock, Plus, Settings, Trash2 } from 'lucide-react';
 import type { Collection } from '../../shared/types';
 import { cn } from '../../shared/utils';
 import { IconGlyph } from '../../components/IconGlyph';
@@ -10,7 +10,7 @@ interface SidebarProps {
   selectedId: string;
   viewMode: string;
   onSelectCollection: (id: string) => void;
-  onSelectView: (view: 'collections' | 'favorites' | 'archived' | 'vault' | 'settings') => void;
+  onSelectView: (view: 'collections' | 'favorites' | 'archived' | 'trash' | 'vault' | 'settings') => void;
 }
 
 export function Sidebar({ collections, selectedId, viewMode, onSelectCollection, onSelectView }: SidebarProps) {
@@ -22,6 +22,8 @@ export function Sidebar({ collections, selectedId, viewMode, onSelectCollection,
     if (!title?.trim()) return;
     await createCollection(title.trim(), selectedId);
   }
+
+  const collectionRows = flattenCollections(collections);
 
   return (
     <aside className="hidden w-72 shrink-0 flex-col border-r-2 border-ink bg-paper-soft lg:flex">
@@ -42,6 +44,7 @@ export function Sidebar({ collections, selectedId, viewMode, onSelectCollection,
         <NavButton active={viewMode === 'collections' || viewMode === 'collection'} icon={<Boxes className="h-4 w-4" />} label="Collections" onClick={() => onSelectView('collections')} />
         <NavButton active={viewMode === 'favorites'} icon={<Heart className="h-4 w-4" />} label="Favorites" onClick={() => onSelectView('favorites')} />
         <NavButton active={viewMode === 'archived'} icon={<Archive className="h-4 w-4" />} label="Archived" onClick={() => onSelectView('archived')} />
+        <NavButton active={viewMode === 'trash'} icon={<Trash2 className="h-4 w-4" />} label="Trash" onClick={() => onSelectView('trash')} />
         <NavButton active={viewMode === 'vault'} icon={<Lock className="h-4 w-4" />} label="Vault" onClick={() => onSelectView('vault')} />
         <NavButton active={viewMode === 'settings'} icon={<Settings className="h-4 w-4" />} label="Settings" onClick={() => onSelectView('settings')} />
       </nav>
@@ -55,7 +58,7 @@ export function Sidebar({ collections, selectedId, viewMode, onSelectCollection,
           </button>
         </div>
         <div className="space-y-0.5">
-          {collections.map((collection, i) => (
+          {collectionRows.map(({ collection, depth }, i) => (
             <button
               key={collection.id}
               className={cn(
@@ -69,6 +72,7 @@ export function Sidebar({ collections, selectedId, viewMode, onSelectCollection,
                 const linkId = event.dataTransfer.getData('application/x-linkscape-link');
                 if (linkId) void moveLink(linkId, collection.id);
               }}
+              style={{ paddingLeft: `${0.75 + Math.min(depth, 4) * 1.1}rem` }}
             >
               <span className="editorial-index text-[10px] font-semibold text-vermillion">{String(i + 1).padStart(2, '0')}</span>
               <span className="grid h-5 w-5 place-items-center text-ink-soft [&_*]:h-3.5 [&_*]:w-3.5">
@@ -91,6 +95,29 @@ export function Sidebar({ collections, selectedId, viewMode, onSelectCollection,
   );
 }
 
+function flattenCollections(collections: Collection[]) {
+  const byParent = new Map<string | undefined, Collection[]>();
+  for (const collection of collections) {
+    const siblings = byParent.get(collection.parentId) ?? [];
+    siblings.push(collection);
+    byParent.set(collection.parentId, siblings);
+  }
+  for (const siblings of byParent.values()) siblings.sort((a, b) => a.order - b.order);
+  const rows: Array<{ collection: Collection; depth: number }> = [];
+  const seen = new Set<string>();
+  const visit = (parentId: string | undefined, depth: number) => {
+    for (const collection of byParent.get(parentId) ?? []) {
+      if (seen.has(collection.id)) continue;
+      seen.add(collection.id);
+      rows.push({ collection, depth });
+      visit(collection.id, depth + 1);
+    }
+  };
+  visit(undefined, 0);
+  for (const collection of collections) if (!seen.has(collection.id)) rows.push({ collection, depth: 0 });
+  return rows;
+}
+
 function NavButton({ active, icon, label, onClick }: { active: boolean; icon: ReactNode; label: string; onClick: () => void }) {
   return (
     <button
@@ -108,7 +135,7 @@ function NavButton({ active, icon, label, onClick }: { active: boolean; icon: Re
 
 interface MobileNavBarProps {
   viewMode: string;
-  onSelectView: (view: 'collections' | 'favorites' | 'archived' | 'vault' | 'settings') => void;
+  onSelectView: (view: 'collections' | 'favorites' | 'archived' | 'trash' | 'vault' | 'settings') => void;
 }
 
 export function MobileNavBar({ viewMode, onSelectView }: MobileNavBarProps) {
@@ -117,6 +144,7 @@ export function MobileNavBar({ viewMode, onSelectView }: MobileNavBarProps) {
       <MobileTab active={viewMode === 'collections' || viewMode === 'collection'} icon={<Boxes className="h-4 w-4" />} label="Collections" onClick={() => onSelectView('collections')} />
       <MobileTab active={viewMode === 'favorites'} icon={<Heart className="h-4 w-4" />} label="Favorites" onClick={() => onSelectView('favorites')} />
       <MobileTab active={viewMode === 'archived'} icon={<Archive className="h-4 w-4" />} label="Archived" onClick={() => onSelectView('archived')} />
+      <MobileTab active={viewMode === 'trash'} icon={<Trash2 className="h-4 w-4" />} label="Trash" onClick={() => onSelectView('trash')} />
       <MobileTab active={viewMode === 'vault'} icon={<Lock className="h-4 w-4" />} label="Vault" onClick={() => onSelectView('vault')} />
       <MobileTab active={viewMode === 'settings'} icon={<Settings className="h-4 w-4" />} label="Settings" onClick={() => onSelectView('settings')} />
     </nav>

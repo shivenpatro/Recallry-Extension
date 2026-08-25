@@ -20,6 +20,19 @@ export function safeDomain(url: string) {
   }
 }
 
+export function normalizeWebsiteUrl(value: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('Invalid website URL');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Only http(s) website URLs are supported');
+  }
+  return parsed.href;
+}
+
 export function normalizeSearch(input: string) {
   return input.trim().toLocaleLowerCase();
 }

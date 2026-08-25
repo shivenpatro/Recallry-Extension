@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Archive, ExternalLink, Folder, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -14,24 +14,48 @@ interface SpotlightProps {
 
 export function Spotlight({ open, onClose, onOpenCollection }: SpotlightProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [domainFilter, setDomainFilter] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('any');
+  const [typeFilter, setTypeFilter] = useState('all');
   const query = useLinkscapeStore((state) => state.searchQuery);
   const collections = useLinkscapeStore((state) => state.collections);
   const links = useLinkscapeStore((state) => state.links);
   const setQuery = useLinkscapeStore((state) => state.setSearchQuery);
   const setSelectedCollection = useLinkscapeStore((state) => state.setSelectedCollection);
+  const accessibleLinks = useMemo(() => {
+    const unlocked = isVaultUnlocked();
+    const days = dateFilter === 'any' ? 0 : Number(dateFilter);
+    const cutoff = days ? Date.now() - days * 86_400_000 : 0;
+    return links.filter((link) =>
+      !link.deletedAt
+      && (!link.isVaultProtected || unlocked)
+      && (!domainFilter || link.domain === domainFilter)
+      && (!tagFilter || link.tags.includes(tagFilter))
+      && (!cutoff || new Date(link.createdAt).getTime() >= cutoff)
+    );
+  }, [dateFilter, domainFilter, links, tagFilter]);
+  const domains = useMemo(() => [...new Set(links.filter((link) => !link.deletedAt).map((link) => link.domain))].filter(Boolean).sort(), [links]);
+  const tags = useMemo(() => [...new Set(links.filter((link) => !link.deletedAt).flatMap((link) => link.tags))].sort(), [links]);
   const results = useMemo(() => {
     const unlocked = isVaultUnlocked();
     return runGlobalSearch(
       query,
-      collections.filter((collection) => !collection.isVaultProtected || unlocked),
-      links.filter((link) => !link.isVaultProtected || unlocked)
-    );
-  }, [collections, links, query]);
+      collections.filter((collection) => collection.status !== 'trashed' && (!collection.isVaultProtected || unlocked)),
+      accessibleLinks
+    ).filter((result) => typeFilter === 'all' || result.type === typeFilter);
+  }, [accessibleLinks, collections, query, typeFilter]);
   const topResults = useMemo(() => results.slice(0, 12), [results]);
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 50);
+    if (open) {
+      setActiveIndex(0);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
   }, [open]);
+
+  useEffect(() => setActiveIndex(0), [dateFilter, domainFilter, query, tagFilter, typeFilter]);
 
   function openResult(result: (typeof topResults)[number]) {
     if (result.type === 'collection') {
@@ -81,8 +105,28 @@ export function Spotlight({ open, onClose, onOpenCollection }: SpotlightProps) {
                   placeholder="Search the archive…"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault();
+                      setActiveIndex((index) => Math.min(index + 1, topResults.length - 1));
+                    }
+                    if (event.key === 'ArrowUp') {
+                      event.preventDefault();
+                      setActiveIndex((index) => Math.max(index - 1, 0));
+                    }
+                    if (event.key === 'Enter' && topResults[activeIndex]) {
+                      event.preventDefault();
+                      openResult(topResults[activeIndex]);
+                    }
+                  }}
                 />
                 <kbd className="editorial-index border border-ink px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-ink-soft">Esc</kbd>
+              </div>
+              <div className="grid grid-cols-2 gap-px border-b border-ink bg-ink sm:grid-cols-4">
+                <FilterSelect label="Type" value={typeFilter} onChange={setTypeFilter} options={[['all', 'Everything'], ['collection', 'Collections'], ['link', 'Cards']]} />
+                <FilterSelect label="Domain" value={domainFilter} onChange={setDomainFilter} options={[['', 'Any domain'], ...domains.map((domain) => [domain, domain] as [string, string])]} />
+                <FilterSelect label="Date" value={dateFilter} onChange={setDateFilter} options={[['any', 'Any date'], ['7', 'Past week'], ['30', 'Past month'], ['365', 'Past year']]} />
+                <FilterSelect label="Tag" value={tagFilter} onChange={setTagFilter} options={[['', 'Any tag'], ...tags.map((tag) => [tag, tag] as [string, string])]} />
               </div>
               <div className="max-h-[56vh] overflow-y-auto">
                 {topResults.length === 0 ? (
@@ -94,7 +138,8 @@ export function Spotlight({ open, onClose, onOpenCollection }: SpotlightProps) {
                       initial={{ opacity: 0, x: -6 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.02 }}
-                      className="flex w-full items-center gap-3 border-b border-slate-rule px-5 py-3 text-left transition hover:bg-ink hover:text-paper"
+                      className={`flex w-full items-center gap-3 border-b border-slate-rule px-5 py-3 text-left transition hover:bg-ink hover:text-paper ${index === activeIndex ? 'bg-ink text-paper' : ''}`}
+                      onMouseEnter={() => setActiveIndex(index)}
                       onClick={() => openResult(result)}
                     >
                       <span className="editorial-index w-6 text-[10px] font-semibold text-vermillion">
@@ -117,5 +162,16 @@ export function Spotlight({ open, onClose, onOpenCollection }: SpotlightProps) {
         </div>
       </Dialog>
     </Transition>
+  );
+}
+
+function FilterSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<[string, string]> }) {
+  return (
+    <label className="min-w-0 bg-paper-soft px-3 py-2">
+      <span className="editorial-index block text-[8px] font-semibold uppercase tracking-wider text-ink-soft/50">{label}</span>
+      <select className="mt-0.5 w-full bg-transparent text-xs font-semibold text-ink outline-none" value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map(([optionValue, optionLabel]) => <option key={optionValue || 'all'} value={optionValue}>{optionLabel}</option>)}
+      </select>
+    </label>
   );
 }

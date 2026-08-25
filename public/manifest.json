@@ -25,8 +25,8 @@
     "type": "module"
   },
   "options_page": "dashboard.html",
-  "permissions": ["contextMenus", "tabs"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": ["activeTab", "alarms", "contextMenus", "scripting", "storage"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "commands": {
     "save-current-page": {
       "suggested_key": {
@@ -37,24 +37,17 @@
     },
     "open-search": {
       "suggested_key": {
-        "default": "Ctrl+K",
-        "mac": "Command+K"
+        "default": "Ctrl+Shift+K",
+        "mac": "Command+Shift+K"
       },
       "description": "Open Linkscape search"
     },
     "lock-vault": {
       "suggested_key": {
-        "default": "Ctrl+L",
-        "mac": "Command+L"
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
       },
       "description": "Lock Linkscape vault"
     }
-  },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
-    }
-  ]
+  }
 }

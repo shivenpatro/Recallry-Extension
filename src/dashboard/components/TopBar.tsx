@@ -5,10 +5,11 @@ interface TopBarProps {
   query: string;
   onQueryChange: (query: string) => void;
   onOpenSearch: () => void;
+  onFilter: () => void;
   onAdd: () => void;
 }
 
-export function TopBar({ query, onQueryChange, onOpenSearch, onAdd }: TopBarProps) {
+export function TopBar({ query, onQueryChange, onOpenSearch, onFilter, onAdd }: TopBarProps) {
   return (
     <header className="flex items-center gap-3 border-b border-slate-rule px-6 py-4">
       <button
@@ -21,13 +22,14 @@ export function TopBar({ query, onQueryChange, onOpenSearch, onAdd }: TopBarProp
           value={query}
           placeholder="Search the archive…"
           onChange={(event) => onQueryChange(event.target.value)}
+          onFocus={onOpenSearch}
           onClick={(event) => event.stopPropagation()}
         />
         <span className="editorial-index border border-ink bg-paper px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-soft">
           ⌘K
         </span>
       </button>
-      <Button variant="ghost" title="Filters">
+      <Button variant="ghost" title="Search and filters" onClick={onFilter}>
         <Filter className="h-4 w-4" aria-hidden />
       </Button>
       <Button onClick={onAdd}>

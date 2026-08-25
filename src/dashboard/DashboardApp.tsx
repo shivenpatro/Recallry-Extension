@@ -8,7 +8,7 @@ import {
   useSensor,
   useSensors
 } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { motion } from 'framer-motion';
 import { Archive, Download, Grid2X2, Link2, Upload } from 'lucide-react';
 import { useLinkscapeStore } from '../store/linkscapeStore';
@@ -17,7 +17,8 @@ import { EmptyState } from '../components/EmptyState';
 import { COLLECTION_THEMES } from '../shared/constants';
 import { cn, downloadText, faviconForUrl, safeDomain } from '../shared/utils';
 import { filterLinks, matchesSmartRules } from '../services/search';
-import { exportAsJson, exportLinksAsCsv, exportLinksAsHtml, importBackup, importBookmarkHtml, importCsv } from '../services/importExport';
+import { exportAsJson, exportLinksAsCsv, exportLinksAsHtml, importBackup, importBookmarkHtml, importCsv, previewImport } from '../services/importExport';
+import { createAutomaticBackup } from '../services/backups';
 import { Sidebar, MobileNavBar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { CollectionCard } from './components/CollectionCard';
@@ -26,9 +27,9 @@ import { Spotlight } from './components/Spotlight';
 import { BulkActionBar } from './components/BulkActionBar';
 import { VaultPanel } from './components/VaultPanel';
 import { SettingsPanel } from './components/SettingsPanel';
-import { isVaultUnlocked, lockVault } from '../services/vault';
+import { isVaultUnlocked, lockVault, touchVaultSession } from '../services/vault';
 
-type ViewMode = 'collections' | 'collection' | 'favorites' | 'archived' | 'vault' | 'settings';
+type ViewMode = 'collections' | 'collection' | 'favorites' | 'archived' | 'trash' | 'vault' | 'settings';
 
 export function DashboardApp() {
   const {
@@ -39,6 +40,7 @@ export function DashboardApp() {
     searchQuery,
     isSearchOpen,
     isLoading,
+    error,
     init,
     setSelectedCollection,
     setSearchQuery,
@@ -59,6 +61,13 @@ export function DashboardApp() {
   useEffect(() => {
     void init();
   }, [init]);
+
+  useEffect(() => {
+    if (window.location.hash === '#search' || new URLSearchParams(window.location.search).get('search') === '1') {
+      setSearchOpen(true);
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  }, [setSearchOpen]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -84,6 +93,7 @@ export function DashboardApp() {
     const extensionApi = (globalThis as { chrome?: typeof chrome }).chrome;
     const listener = (message: { type?: string }) => {
       if (message.type === 'LINKSCAPE_VAULT_LOCKED') {
+        useLinkscapeStore.getState().clearSelection();
         void lockVault().then(() => refresh());
       }
     };
@@ -92,7 +102,20 @@ export function DashboardApp() {
   }, [refresh]);
 
   useEffect(() => {
-    const handleAutoLock = () => void refresh();
+    const onActivity = () => void touchVaultSession();
+    window.addEventListener('pointerdown', onActivity, { passive: true });
+    window.addEventListener('keydown', onActivity);
+    return () => {
+      window.removeEventListener('pointerdown', onActivity);
+      window.removeEventListener('keydown', onActivity);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleAutoLock = () => {
+      useLinkscapeStore.getState().clearSelection();
+      void refresh();
+    };
     window.addEventListener('linkscape-vault-locked', handleAutoLock);
     return () => window.removeEventListener('linkscape-vault-locked', handleAutoLock);
   }, [refresh]);
@@ -101,19 +124,22 @@ export function DashboardApp() {
   const accessibleCollections = collections.filter((collection) => !collection.isVaultProtected || vaultUnlocked);
   const activeCollections = accessibleCollections.filter((collection) => collection.status === 'active');
   const archivedCollections = accessibleCollections.filter((collection) => collection.status === 'archived');
+  const trashedCollections = accessibleCollections.filter((collection) => collection.status === 'trashed');
   const favoriteCollections = activeCollections.filter((collection) => collection.isFavorite);
-  const visibleCollections = viewMode === 'favorites' ? favoriteCollections : viewMode === 'archived' ? archivedCollections : activeCollections;
+  const visibleCollections = viewMode === 'favorites' ? favoriteCollections : viewMode === 'archived' ? archivedCollections : viewMode === 'trash' ? trashedCollections : activeCollections;
   const selectedCollection = collections.find((collection) => collection.id === selectedCollectionId) ?? activeCollections[0];
   const selectedCollectionLocked = Boolean(selectedCollection?.isVaultProtected && !vaultUnlocked);
   const selectedCollectionLinks = useMemo(() => {
     if (!selectedCollection) return [];
-    const direct = links.filter((link) => link.collectionId === selectedCollection.id && !link.isArchived && (!link.isVaultProtected || vaultUnlocked));
+    const direct = links.filter((link) => link.collectionId === selectedCollection.id && !link.isArchived && !link.deletedAt && (!link.isVaultProtected || vaultUnlocked));
     const smart = selectedCollection.smartRules
-      ? links.filter((link) => !link.isArchived && (!link.isVaultProtected || vaultUnlocked) && matchesSmartRules(link, selectedCollection.smartRules))
+      ? links.filter((link) => !link.isArchived && !link.deletedAt && (!link.isVaultProtected || vaultUnlocked) && matchesSmartRules(link, selectedCollection.smartRules))
       : [];
     return filterLinks([...direct, ...smart.filter((link) => !direct.some((directLink) => directLink.id === link.id))], searchQuery, tagFilter);
   }, [links, searchQuery, selectedCollection, tagFilter, vaultUnlocked]);
-  const allTags = [...new Set(links.flatMap((link) => link.tags))].sort();
+  const allTags = [...new Set(links.filter((link) => !link.deletedAt).flatMap((link) => link.tags))].sort();
+  const archivedLinks = links.filter((link) => link.isArchived && !link.deletedAt && (!link.isVaultProtected || vaultUnlocked));
+  const trashedLinks = links.filter((link) => link.deletedAt && !link.deletedWithCollectionId && (!link.isVaultProtected || vaultUnlocked));
 
   async function handleCreateCollection() {
     const title = prompt('Collection name');
@@ -125,6 +151,10 @@ export function DashboardApp() {
   async function handleOpenCollection(collectionId: string) {
     const collection = collections.find((item) => item.id === collectionId);
     if (!collection) return;
+    if (collection.status === 'trashed') {
+      setViewMode('trash');
+      return;
+    }
     if (collection.isVaultProtected && !isVaultUnlocked()) {
       setViewMode('vault');
       return;
@@ -150,20 +180,21 @@ export function DashboardApp() {
     if (title === null) return;
     const notes = prompt('Notes (optional)', '') ?? '';
     const tagInput = prompt('Tags separated by commas (optional)', '') ?? '';
-    await saveLink(
-      collectionId,
-      {
-        title: title.trim() || parsedUrl.href,
-        url: parsedUrl.href,
-        domain: safeDomain(parsedUrl.href),
-        faviconUrl: faviconForUrl(parsedUrl.href)
-      },
-      notes,
-      tagInput
-        .split(',')
-        .map((tag) => tag.trim().toLocaleLowerCase())
-        .filter(Boolean)
-    );
+    try {
+      await saveLink(
+        collectionId,
+        {
+          title: title.trim() || parsedUrl.href,
+          url: parsedUrl.href,
+          domain: safeDomain(parsedUrl.href),
+          faviconUrl: faviconForUrl(parsedUrl.href)
+        },
+        notes,
+        tagInput.split(',').map((tag) => tag.trim().toLocaleLowerCase()).filter(Boolean)
+      );
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'The website could not be saved');
+    }
   }
 
   async function handleCollectionDragEnd(event: DragEndEvent) {
@@ -203,9 +234,19 @@ export function DashboardApp() {
     try {
       const text = await file.text();
       const filename = file.name.toLocaleLowerCase();
-      if (filename.endsWith('.json')) await importBackup(text);
-      else if (filename.endsWith('.csv')) await importCsv(text, selectedCollectionId);
-      else await importBookmarkHtml(text, selectedCollectionId);
+      const preview = previewImport(file.name, text);
+      const previewMessage = preview.kind === 'backup'
+        ? `Restore ${preview.collections} collections and ${preview.links} cards from this backup? Your current data will be downloaded and checkpointed first.`
+        : `Import ${preview.links} websites${preview.collections ? ` and ${preview.collections} folders` : ''} into the selected collection?${preview.skipped ? ` ${preview.skipped} invalid rows will be skipped.` : ''}`;
+      if (!window.confirm(previewMessage)) return;
+      await createAutomaticBackup('before-import');
+      if (filename.endsWith('.json')) {
+        downloadText(`linkscape-before-restore-${new Date().toISOString().slice(0, 10)}.json`, 'application/json', await exportAsJson());
+        await importBackup(text);
+      } else {
+        if (filename.endsWith('.csv')) await importCsv(text, selectedCollectionId);
+        else await importBookmarkHtml(text, selectedCollectionId);
+      }
       await refresh();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : 'Import failed');
@@ -226,6 +267,18 @@ export function DashboardApp() {
     );
   }
 
+  if (error) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-paper p-6 text-ink">
+        <div className="paper-card max-w-lg p-8 shadow-editorial">
+          <h1 className="font-display text-3xl font-medium">Linkscape could not open</h1>
+          <p className="mt-3 text-sm leading-6 text-ink-soft">{error}</p>
+          <Button className="mt-5" onClick={() => void init()}>Try again</Button>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen overflow-hidden bg-paper text-ink">
       <div className="flex min-h-screen">
@@ -242,11 +295,12 @@ export function DashboardApp() {
             query={searchQuery}
             onQueryChange={setSearchQuery}
             onOpenSearch={() => setSearchOpen(true)}
+            onFilter={() => setSearchOpen(true)}
             onAdd={handleCreateCollection}
           />
 
           <div className="flex min-h-0 flex-1 flex-col px-6 pb-6">
-              {viewMode === 'collections' || viewMode === 'favorites' || viewMode === 'archived' ? (
+              {viewMode === 'collections' || viewMode === 'favorites' || viewMode === 'archived' || viewMode === 'trash' ? (
                 <motion.div
                   key={viewMode}
                   initial={{ opacity: 0, y: 16 }}
@@ -257,16 +311,18 @@ export function DashboardApp() {
                   <div className="mb-8 flex items-end justify-between border-b-2 border-ink pb-5">
                     <div>
                       <div className="editorial-index mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-vermillion">
-                        {viewMode === 'favorites' ? 'Curated picks' : viewMode === 'archived' ? 'The stacks' : 'The archive'}
+                        {viewMode === 'favorites' ? 'Curated picks' : viewMode === 'archived' ? 'The stacks' : viewMode === 'trash' ? 'Recovery' : 'The archive'}
                       </div>
                       <h1 className="font-display text-6xl font-medium leading-[0.9] tracking-tightest text-ink">
-                        {viewMode === 'favorites' ? 'Favorites' : viewMode === 'archived' ? 'Archived' : 'Collections'}
+                        {viewMode === 'favorites' ? 'Favorites' : viewMode === 'archived' ? 'Archived' : viewMode === 'trash' ? 'Trash' : 'Collections'}
                       </h1>
                       <p className="mt-3 max-w-md text-sm leading-6 text-ink-soft">
                         {viewMode === 'favorites'
                           ? 'The spaces you keep coming back to.'
                           : viewMode === 'archived'
                             ? 'Quietly shelved, never lost.'
+                            : viewMode === 'trash'
+                              ? 'Restore mistakes or permanently remove what you no longer need.'
                             : 'Visual workspaces for every corner of the web.'}
                       </p>
                     </div>
@@ -276,22 +332,23 @@ export function DashboardApp() {
                     </div>
                   </div>
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleCollectionDragEnd}>
-                     <SortableContext items={visibleCollections.map((collection) => collection.id)} strategy={verticalListSortingStrategy}>
-                       {visibleCollections.length === 0 ? (
+                     <SortableContext items={visibleCollections.map((collection) => collection.id)} strategy={rectSortingStrategy}>
+                       {visibleCollections.length === 0 && !(viewMode === 'archived' && archivedLinks.length > 0) && !(viewMode === 'trash' && trashedLinks.length > 0) ? (
                          <EmptyState
-                           title={viewMode === 'favorites' ? 'No favorite collections' : viewMode === 'archived' ? 'Nothing archived' : 'No collections yet'}
-                           body={viewMode === 'favorites' ? 'Favorite a collection from its actions menu to keep it close.' : viewMode === 'archived' ? 'Archived collections will appear here.' : 'Create your first visual space to start saving websites.'}
+                           title={viewMode === 'favorites' ? 'No favorite collections' : viewMode === 'archived' ? 'Nothing archived' : viewMode === 'trash' ? 'Trash is empty' : 'No collections yet'}
+                           body={viewMode === 'favorites' ? 'Favorite a collection from its actions menu to keep it close.' : viewMode === 'archived' ? 'Archived collections will appear here.' : viewMode === 'trash' ? 'Deleted collections and cards will stay here until you remove them permanently.' : 'Create your first visual space to start saving websites.'}
                            action={viewMode === 'collections' ? 'Create collection' : undefined}
                            onAction={viewMode === 'collections' ? handleCreateCollection : undefined}
                          />
                        ) : (
+                         <>
                          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-5">
                            {visibleCollections.map((collection, index) => (
                               <CollectionCard
                                key={collection.id}
                                collection={collection}
                                index={index}
-                                count={links.filter((link) => link.collectionId === collection.id).length}
+                                count={links.filter((link) => link.collectionId === collection.id && !link.isArchived && (viewMode === 'trash' ? Boolean(link.deletedAt) : !link.deletedAt)).length}
                                 onOpenVault={() => setViewMode('vault')}
                                onOpen={() => {
                                void handleOpenCollection(collection.id);
@@ -299,6 +356,27 @@ export function DashboardApp() {
                              />
                            ))}
                          </div>
+                         {viewMode === 'archived' && archivedLinks.length > 0 ? (
+                           <section className="mt-10 border-t-2 border-ink pt-6">
+                             <div className="editorial-index mb-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-vermillion">
+                               Archived cards · {archivedLinks.length}
+                             </div>
+                             <div className="masonry pb-24">
+                               {archivedLinks.map((link) => <LinkCardItem key={link.id} link={link} selected={selectedLinkIds.includes(link.id)} />)}
+                             </div>
+                           </section>
+                         ) : null}
+                         {viewMode === 'trash' && trashedLinks.length > 0 ? (
+                           <section className="mt-10 border-t-2 border-ink pt-6">
+                             <div className="editorial-index mb-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-vermillion">
+                               Deleted cards · {trashedLinks.length}
+                             </div>
+                             <div className="masonry pb-24">
+                               {trashedLinks.map((link) => <LinkCardItem key={link.id} link={link} selected={selectedLinkIds.includes(link.id)} />)}
+                             </div>
+                           </section>
+                         ) : null}
+                         </>
                        )}
                      </SortableContext>
                   </DndContext>
@@ -367,7 +445,7 @@ export function DashboardApp() {
                     />
                   ) : (
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleLinkDragEnd}>
-                      <SortableContext items={selectedCollectionLinks.map((link) => link.id)} strategy={verticalListSortingStrategy}>
+                      <SortableContext items={selectedCollectionLinks.map((link) => link.id)} strategy={rectSortingStrategy}>
                         <div className="masonry pb-24">
                           {selectedCollectionLinks.map((link) => (
                             <LinkCardItem key={link.id} link={link} selected={selectedLinkIds.includes(link.id)} />

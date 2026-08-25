@@ -2,12 +2,13 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
 import { Menu } from '@headlessui/react';
-import { Archive, Copy, GripVertical, Lock, MoreHorizontal, Pencil, Pin, Star, Trash2, Unlock } from 'lucide-react';
+import { Archive, Copy, GripVertical, Lock, MoreHorizontal, Palette, Pencil, Pin, RotateCcw, Star, Trash2, Unlock } from 'lucide-react';
 import type { Collection } from '../../shared/types';
 import { COLLECTION_THEMES } from '../../shared/constants';
 import { cn } from '../../shared/utils';
 import { useLinkscapeStore } from '../../store/linkscapeStore';
 import { isVaultUnlocked } from '../../services/vault';
+import { DEFAULT_COLLECTION_ID } from '../../shared/constants';
 
 interface CollectionCardProps {
   collection: Collection;
@@ -25,10 +26,27 @@ export function CollectionCard({ collection, count, index, onOpen, onOpenVault }
   const restoreCollection = useLinkscapeStore((state) => state.restoreCollection);
   const setCollectionProtection = useLinkscapeStore((state) => state.setCollectionProtection);
   const deleteCollection = useLinkscapeStore((state) => state.deleteCollection);
+  const restoreDeletedCollection = useLinkscapeStore((state) => state.restoreDeletedCollection);
+  const permanentlyDeleteCollection = useLinkscapeStore((state) => state.permanentlyDeleteCollection);
+  const isTrashed = collection.status === 'trashed';
   const style = {
     transform: CSS.Transform.toString(transform),
     transition
   };
+
+  async function editDetails() {
+    const description = prompt('Collection description', collection.description);
+    if (description === null) return;
+    const icon = prompt('Icon name', collection.icon);
+    if (icon === null) return;
+    const theme = prompt(`Color theme (${Object.keys(COLLECTION_THEMES).join(', ')})`, collection.theme);
+    if (theme === null) return;
+    if (!(theme in COLLECTION_THEMES)) {
+      window.alert('Choose one of the listed color themes.');
+      return;
+    }
+    await updateCollection(collection.id, { description: description.trim(), icon: icon.trim() || 'Folder', theme: theme as Collection['theme'] });
+  }
 
   return (
     <motion.article
@@ -67,7 +85,7 @@ export function CollectionCard({ collection, count, index, onOpen, onOpenVault }
         </div>
 
         {/* Title block — oversized editorial serif */}
-        <button className="mt-5 block flex-1 text-left" onClick={onOpen}>
+        <button className="mt-5 block flex-1 text-left" onClick={onOpen} disabled={isTrashed}>
           <h2 className="font-display text-3xl font-medium leading-[0.95] tracking-tightest text-ink">
             {collection.title}
           </h2>
@@ -81,6 +99,7 @@ export function CollectionCard({ collection, count, index, onOpen, onOpenVault }
           <button
             className="editorial-index text-xs font-medium uppercase tracking-[0.12em] text-ink transition hover:text-vermillion"
             onClick={onOpen}
+            disabled={isTrashed}
           >
             <span className="text-vermillion">{String(count).padStart(2, '0')}</span> cards →
           </button>
@@ -106,6 +125,16 @@ export function CollectionCard({ collection, count, index, onOpen, onOpenVault }
                 }}
               >
                 <Pencil className="h-3.5 w-3.5" /> Rename
+              </button>
+            )}
+          </Menu.Item>
+          <Menu.Item>
+            {({ active }) => (
+              <button
+                className={cn('flex w-full items-center gap-3 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition', active ? 'bg-ink text-paper' : 'text-ink')}
+                onClick={() => void editDetails()}
+              >
+                <Palette className="h-3.5 w-3.5" /> Details
               </button>
             )}
           </Menu.Item>
@@ -143,9 +172,9 @@ export function CollectionCard({ collection, count, index, onOpen, onOpenVault }
             {({ active }) => (
               <button
                 className={cn('flex w-full items-center gap-3 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition', active ? 'bg-ink text-paper' : 'text-ink')}
-                onClick={() => void (collection.status === 'archived' ? restoreCollection(collection.id) : archiveCollection(collection.id))}
+                onClick={() => void (isTrashed ? restoreDeletedCollection(collection.id) : collection.status === 'archived' ? restoreCollection(collection.id) : archiveCollection(collection.id))}
               >
-                <Archive className="h-3.5 w-3.5" /> {collection.status === 'archived' ? 'Restore' : 'Archive'}
+                {isTrashed ? <RotateCcw className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />} {collection.status === 'archived' || isTrashed ? 'Restore' : 'Archive'}
               </button>
             )}
           </Menu.Item>
@@ -167,16 +196,22 @@ export function CollectionCard({ collection, count, index, onOpen, onOpenVault }
             )}
           </Menu.Item>
           <div className="my-1 h-px bg-ink/10" />
-          <Menu.Item>
+          {collection.id !== DEFAULT_COLLECTION_ID ? <Menu.Item>
             {({ active }) => (
               <button
                 className={cn('flex w-full items-center gap-3 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition', active ? 'bg-vermillion text-paper' : 'text-vermillion')}
-                onClick={() => void deleteCollection(collection.id)}
+                onClick={() => {
+                  if (isTrashed) {
+                    if (window.confirm(`Permanently delete “${collection.title}” and every card inside it? This cannot be undone.`)) void permanentlyDeleteCollection(collection.id);
+                  } else if (window.confirm(`Move “${collection.title}” and every card inside it to Trash?`)) {
+                    void deleteCollection(collection.id);
+                  }
+                }}
               >
-                <Trash2 className="h-3.5 w-3.5" /> Delete
+                <Trash2 className="h-3.5 w-3.5" /> {isTrashed ? 'Delete forever' : 'Move to Trash'}
               </button>
             )}
-          </Menu.Item>
+          </Menu.Item> : null}
         </Menu.Items>
       </Menu>
     </motion.article>

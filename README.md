@@ -1,87 +1,74 @@
 # Linkscape
 
-Linkscape is a local-first Chrome and Edge extension for saving, organizing, and revisiting the web as visual collections. It is designed for people who want the speed of a bookmark manager with the clarity of a personal research archive.
+Linkscape is a local-first Chrome and Edge extension for saving, organizing, searching, and protecting visual collections of websites. It combines fast capture with an offline personal archive and an optional encrypted Vault.
 
-The project is currently in private-beta development. The core workflows are implemented and tested, but the Chrome Web Store hardening checklist in this document still needs to be completed before public release.
+The project is release-candidate software. Core workflows, data safety, Vault boundaries, permission minimization, and production packaging are covered by automated tests and browser-level smoke checks. Store account setup, listing assets, policy declarations, and final human QA remain external release tasks.
 
-## What Works Today
+## Shipped Features
 
-- Quick-save popup for the active page.
-- Save to an existing collection or create a new collection.
-- Context-menu and keyboard-command saving.
-- Page title, URL, domain, page favicon, notes, tags, and available Open Graph image capture.
-- Collections with title, description, icon, theme, pin, favorite, archive, duplicate, and nested-parent support.
-- Visual link cards with open, notes, tags, duplicate, delete, selection, reorder, and drag-to-move actions.
-- Global fuzzy search across collections, URLs, titles, notes, tags, and labels.
+- Quick-save popup with recent destinations, proactive duplicate warnings, Undo, notes, tags, locally cached media when permitted, and optional offline reading snapshots.
+- Direct save to an existing collection or a newly created collection.
+- Context-menu destinations and configurable Chrome keyboard commands.
+- Unlimited collections with title, description, icon, theme, pin, favorite, archive, duplicate, protection, ordering, and visible nesting.
+- Visual cards with open, edit notes, tags, labels, move, duplicate, archive/restore, Trash/Restore, permanent delete, selection, reorder, drag-to-move, snapshot viewing, and link-health status.
+- Spotlight-style fuzzy search across collections, URLs, titles, notes, tags, and labels, including arrow-key navigation plus domain, date, tag, and result-type filters.
 - Bulk move, tag, archive, delete, and CSV export.
-- JSON backup and restore.
-- CSV import/export and browser bookmark HTML import/export.
-- Vault Mode with AES-GCM encrypted protected links, PBKDF2 password verification for new Vaults, recovery-question password reset, configurable auto-lock, manual lock, and clean reset.
-- Offline-first IndexedDB storage through Dexie.
+- Validated JSON backup and atomic restore with import previews, an automatic pre-import checkpoint, and five rolling local recovery points.
+- CSV import/export with spreadsheet-injection protection and hierarchy-preserving Chrome, Edge, and Firefox bookmark HTML import/export.
+- On-demand broken-link checks use an optional website permission requested only when the user starts a scan.
+- Vault Mode with AES-GCM encrypted links and collection metadata, PBKDF2 password and recovery verification, shared session locking, inactivity auto-lock, manual lock, and clean reset.
+- Offline-first IndexedDB storage through Dexie, with an explicit schema migration path.
 
-## Current Limitations
+## Current Boundaries
 
-These are intentionally documented rather than presented as completed functionality:
-
-- Public share links and cloud sync are not implemented.
-- Smart collection rules have data support but no complete rule-builder UI.
-- Nested collections are stored but the sidebar is currently flat.
-- Card-level move controls, undo, duplicate detection, import preview, and card restore are planned.
-- Preview images are not downloaded into a local cache.
-- The auto-lock timer is duration-based; full inactivity detection is planned.
-- Existing legacy Vault records may still use the older SHA-256 password verifier for backward compatibility. New Vaults use PBKDF2.
-- Vault protection currently encrypts link payloads. Collection metadata privacy will be strengthened before public release.
+- Public sharing links, cloud sync, billing, AI, collaboration, and mobile apps are future architecture only and must not be advertised as shipped.
+- Smart collection rules have data support and a seeded example but no general-purpose rule-builder UI.
+- Reading snapshots intentionally remove scripts, forms, embedded media, external styles, and tracking-capable resources; they are safe readable copies rather than pixel-perfect page archives.
+- Image caching is best effort under the active tab permission. Cross-origin media that cannot be fetched safely remains a remote URL.
+- Recovery questions are easier to guess than one-time recovery codes. New records use PBKDF2; legacy SHA-256 recovery verifiers remain supported only for migration.
+- Very large masonry collections are not virtualized while drag-and-drop is active.
 
 ## Architecture
 
 ```text
 src/
-  components/          Shared UI primitives
-  dashboard/           Main archive, collection, search, bulk, and Vault UI
-  data/                Dexie database and repository layer
-  extension/           MV3 service worker and page content script
-  popup/               Quick-save popup
-  services/            Capture, search, Vault crypto, import/export, sharing contracts
-  shared/              Types, constants, and utility functions
+  components/          Shared UI primitives and error boundary
+  dashboard/           Main archive, search, card, bulk, Settings, and Vault UI
+  data/                Dexie database and repository boundary
+  extension/           Manifest V3 service worker
+  popup/               Explicit active-tab capture workflow
+  services/            Capture, search, crypto, backup, health, import/export, entitlement, and sync contracts
+  snapshot/            Sandboxed offline reading-snapshot viewer
+  shared/              Types, constants, and utilities
   store/               Zustand application state
-  styles/              Tailwind and global styling
+  styles/              Tailwind and locally bundled fonts
 tests/                 Vitest regression tests
 public/manifest.json   Chrome/Edge Manifest V3 manifest
 ```
 
-## Local Data Model
+All persistent operations pass through `src/data/repositories.ts`. Website URLs are restricted to HTTP(S), imports are prevalidated, protected/unprotected moves preserve encryption boundaries, and backup replacement happens in one IndexedDB transaction.
 
-IndexedDB database: `linkscape`
+## Vault Model
 
-- `collections`: collection identity, hierarchy, ordering, theme, status, favorite/pin state, and Vault flag.
-- `links`: saved page metadata, collection membership, ordering, tags, archive state, and encrypted payload when protected.
-- `tags`: normalized tag records and colors.
-- `meta`: Vault settings and future sync metadata.
+- AES-GCM protects link content and collection display metadata.
+- PBKDF2-SHA-256 verifies new master passwords and recovery answers.
+- A separate data key is wrapped by the password and recovery-derived keys.
+- The unlocked data key is stored only in Chrome's memory-backed `storage.session` for trusted extension contexts.
+- Manual lock, inactivity expiry, browser restart, or clean reset clears the shared session.
+- Existing protected records are migrated to the stronger metadata format after a successful unlock.
 
-All repository operations go through `src/data/repositories.ts`. This keeps a future sync adapter separate from the local data layer.
-
-## Vault Security Model
-
-Vault Mode is local encryption at rest, not an operating-system password manager. When a Vault is unlocked, its in-memory key can be used by the running extension page. Locking clears that key from memory and protected link payloads remain encrypted in IndexedDB.
-
-- AES-GCM protects encrypted link payloads.
-- New Vault password verification uses PBKDF2-SHA-256 with the configured Vault iteration count.
-- New Vaults generate a separate data key and wrap it with the master password key.
-- Recovery answers wrap the same data key so a forgotten password can be reset without losing protected content.
-- Older Vault records remain backward-compatible and should be migrated when their owner unlocks/configures recovery.
-- Recovery answers should be unique and difficult to guess. A future recovery-code flow is preferable for high-value data.
-
-Never commit real passwords, recovery answers, encrypted backups, browser profiles, or private keys to this repository.
+Vault Mode is local encryption at rest, not an operating-system password manager. Someone controlling an unlocked browser profile or device can access content while the Vault is unlocked.
 
 ## Permissions
 
-The extension currently uses:
+- `activeTab`: temporary current-page access after an explicit user action.
+- `scripting`: title, favicon, and preview capture during that action.
+- `contextMenus`: direct save destinations.
+- `storage`: temporary Vault session coordination between trusted extension pages.
+- `alarms`: schedules a daily local recovery point.
+- Optional HTTP(S) host access: requested only when the user starts an on-demand broken-link scan.
 
-- `contextMenus`: save a page from the browser context menu.
-- `tabs`: read the active tab for an explicit save action and open saved links.
-- `<all_urls>` host access: run the packaged content script on pages to read title, favicon, and available preview metadata for an explicit capture workflow.
-
-The host-access model should be reviewed before Web Store submission. The long-term preferred design is to request the narrowest active-tab access possible for user-triggered capture.
+Linkscape installs without persistent host access, has no always-running page content script, analytics SDK, or remote executable code. Fonts are packaged locally.
 
 ## Development
 
@@ -92,45 +79,39 @@ npm install
 npm run lint
 npm run test
 npm run build
+npm audit
 ```
 
-The production build is written to `dist/`. Generated output and dependencies are intentionally ignored by Git.
+The production build is written to `dist/` with source maps disabled.
+On Windows with Microsoft Edge installed, `npm run smoke:edge` loads `dist/` into a clean hidden browser profile and checks desktop/mobile routes plus runtime errors.
 
-## Load Locally
+## Load Unpacked
 
 1. Run `npm run build`.
 2. Open `chrome://extensions` or `edge://extensions`.
 3. Enable Developer mode.
-4. Choose **Load unpacked**.
-5. Select the `dist` directory.
-
-After source changes, rebuild and use the extension page's reload button.
+4. Choose **Load unpacked** and select `dist`.
+5. Reload the extension after rebuilding.
 
 ## Keyboard Commands
 
 - `Ctrl+Shift+S`: save the current page.
-- `Ctrl+K`: open Spotlight search.
-- `Ctrl+L`: lock Vault Mode.
+- `Ctrl+Shift+K`: open Spotlight globally; use `Ctrl+K` inside the dashboard.
+- `Ctrl+Shift+L`: lock Vault globally; use `Ctrl+L` inside the dashboard.
 
-On macOS, use the corresponding Command shortcuts.
+Users can change global assignments from `chrome://extensions/shortcuts`.
 
-## Privacy Position
+## Publishing
 
-Linkscape stores collections, saved links, notes, tags, and Vault metadata locally by default. It does not require an account or cloud service. Page metadata is read only for the user's explicit save workflow. No analytics or advertising SDK is included.
+- Follow [STORE_SUBMISSION.md](STORE_SUBMISSION.md) for build, permission, disclosure, asset, and manual QA instructions.
+- Host [PRIVACY.md](PRIVACY.md) at a stable public HTTPS URL before submission.
+- Zip the contents inside `dist/`, not the repository or the enclosing `dist` folder.
+- Never commit or upload real backups, browser profiles, `.env` files, passwords, recovery answers, private keys, or signing material.
 
-Before public release, the project needs a hosted privacy policy, a final permission review, encrypted backup guidance, and Chrome/Edge end-to-end testing. Chrome Web Store disclosures must accurately describe locally processed browsing activity and user-created content.
+## Security
 
-## Release Checklist
-
-- Keep regression coverage for all protected/unprotected move paths.
-- Encrypt or otherwise minimize protected collection metadata.
-- Complete the inactivity lock behavior and legacy Vault migration.
-- Add delete undo, import preview, duplicate detection, and visible error states.
-- Add Chrome and Edge browser tests, accessibility checks, and performance tests with large datasets.
-- Review `<all_urls>` host access and remove any permission not required by the shipped feature set.
-- Build with production sourcemaps disabled for the submitted artifact.
-- Prepare store screenshots, support URL, privacy policy, permission justifications, and test instructions.
+Please report suspected vulnerabilities privately using [SECURITY.md](SECURITY.md). Do not include real browsing data or Vault credentials in reports.
 
 ## License
 
-No open-source license has been selected yet. Add one before accepting external contributions or publishing a reusable package.
+No open-source license has been selected. All rights remain with the repository owner unless a license is added later.

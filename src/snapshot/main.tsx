@@ -1,10 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { PopupApp } from './PopupApp';
-import { ErrorBoundary } from '../components/ErrorBoundary';
+import { SnapshotApp } from './SnapshotApp';
+import '../styles/global.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ErrorBoundary><PopupApp /></ErrorBoundary>
+    <SnapshotApp />
   </React.StrictMode>
 );

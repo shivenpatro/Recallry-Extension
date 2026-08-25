@@ -1,4 +1,4 @@
-export type CollectionStatus = 'active' | 'archived';
+export type CollectionStatus = 'active' | 'archived' | 'trashed';
 
 export type ThemeName =
   | 'aurora'
@@ -31,6 +31,8 @@ export interface Collection {
   isVaultProtected: boolean;
   status: CollectionStatus;
   smartRules?: SmartCollectionRule[];
+  encryptedMetadata?: EncryptedPayload;
+  deletedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -43,6 +45,8 @@ export interface LinkCard {
   domain: string;
   faviconUrl?: string;
   thumbnailUrl?: string;
+  snapshotHtml?: string;
+  snapshotCapturedAt?: string;
   notes: string;
   tags: string[];
   labels: string[];
@@ -50,6 +54,11 @@ export interface LinkCard {
   isArchived: boolean;
   isVaultProtected: boolean;
   encryptedPayload?: EncryptedPayload;
+  deletedAt?: string;
+  deletedWithCollectionId?: string;
+  healthStatus?: 'healthy' | 'broken' | 'unknown';
+  healthCheckedAt?: string;
+  healthHttpStatus?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -60,6 +69,8 @@ export interface LinkCapture {
   domain: string;
   faviconUrl?: string;
   thumbnailUrl?: string;
+  snapshotHtml?: string;
+  snapshotCapturedAt?: string;
 }
 
 export interface Tag {
@@ -86,6 +97,7 @@ export interface VaultSettings {
   recoveryQuestion?: string;
   recoverySalt?: string;
   recoveryAnswerHash?: string;
+  recoveryKdf?: 'sha256' | 'pbkdf2';
   passwordWrappedKey?: EncryptedPayload;
   recoveryWrappedKey?: EncryptedPayload;
   lockedAt?: string;
@@ -118,6 +130,7 @@ export interface RuntimeMessage<TPayload = unknown> {
     | 'LINKSCAPE_OPEN_DASHBOARD'
     | 'LINKSCAPE_OPEN_SEARCH'
     | 'LINKSCAPE_LOCK_VAULT'
-    | 'LINKSCAPE_VAULT_LOCKED';
+    | 'LINKSCAPE_VAULT_LOCKED'
+    | 'LINKSCAPE_REFRESH_CONTEXT_MENUS';
   payload?: TPayload;
 }

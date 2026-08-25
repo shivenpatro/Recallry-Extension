@@ -1,7 +1,10 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { Database, Download, Network, Upload } from 'lucide-react';
+import { Activity, Database, Download, History, Network, Shield, ShieldCheck, Upload } from 'lucide-react';
 import { Button } from '../../components/Button';
+import { createAutomaticBackup, getBackupHealth, restoreAutomaticBackup, type AutomaticBackupRecord } from '../../services/backups';
+import { useLinkscapeStore } from '../../store/linkscapeStore';
+import { checkLinksHealth, requestLinkHealthPermission, type LinkHealthSummary } from '../../services/linkHealth';
 
 interface SettingsPanelProps {
   onExport: (format: 'json' | 'csv' | 'html') => Promise<void>;
@@ -9,6 +12,53 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ onExport, onImport }: SettingsPanelProps) {
+  const refresh = useLinkscapeStore((state) => state.refresh);
+  const links = useLinkscapeStore((state) => state.links);
+  const [backupStatus, setBackupStatus] = useState<'loading' | 'healthy' | 'stale' | 'missing'>('loading');
+  const [latestBackup, setLatestBackup] = useState<AutomaticBackupRecord>();
+  const [backupCount, setBackupCount] = useState(0);
+  const [healthSummary, setHealthSummary] = useState<LinkHealthSummary>();
+  const [checkingLinks, setCheckingLinks] = useState(false);
+
+  async function refreshBackupHealth() {
+    const health = await getBackupHealth();
+    setBackupStatus(health.status);
+    setLatestBackup(health.latest);
+    setBackupCount(health.count);
+  }
+
+  useEffect(() => {
+    void refreshBackupHealth();
+  }, []);
+
+  async function createRecoveryPoint() {
+    await createAutomaticBackup('manual');
+    await refreshBackupHealth();
+  }
+
+  async function restoreLatest() {
+    if (!latestBackup || !window.confirm(`Restore the recovery point from ${new Date(latestBackup.createdAt).toLocaleString()}? A new checkpoint will be created first.`)) return;
+    await createAutomaticBackup('manual');
+    await restoreAutomaticBackup(latestBackup.id);
+    await refresh();
+    await refreshBackupHealth();
+  }
+
+  async function runLinkCheck() {
+    if (!await requestLinkHealthPermission()) {
+      window.alert('Website access was not granted. Linkscape did not check any links.');
+      return;
+    }
+    setCheckingLinks(true);
+    try {
+      const summary = await checkLinksHealth(links, setHealthSummary);
+      setHealthSummary(summary);
+      await refresh();
+    } finally {
+      setCheckingLinks(false);
+    }
+  }
+
   return (
     <motion.section
       initial={{ opacity: 0, y: 16 }}
@@ -57,7 +107,31 @@ export function SettingsPanel({ onExport, onImport }: SettingsPanelProps) {
           </label>
         </Panel>
 
-        <Panel icon={<Network />} index="03" title="Future Sync Contract">
+        <Panel icon={<History />} index="03" title="Recovery Points">
+          <p className="text-sm leading-6 text-ink-soft">
+            {backupStatus === 'healthy' && latestBackup ? `Protected. Latest local checkpoint: ${new Date(latestBackup.createdAt).toLocaleString()}.` : null}
+            {backupStatus === 'stale' ? 'Your latest local checkpoint is more than two days old.' : null}
+            {backupStatus === 'missing' ? 'No automatic recovery point exists yet.' : null}
+            {backupStatus === 'loading' ? 'Checking local backup health…' : null}
+          </p>
+          <p className="mt-2 editorial-index text-[10px] uppercase tracking-wider text-ink-soft/50">{backupCount} of 5 rolling checkpoints</p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button onClick={() => void createRecoveryPoint()}><ShieldCheck className="h-3.5 w-3.5" /> Back up now</Button>
+            <Button variant="ghost" disabled={!latestBackup} onClick={() => void restoreLatest()}>Restore latest</Button>
+          </div>
+        </Panel>
+
+        <Panel icon={<Activity />} index="04" title="Link Health">
+          <p className="text-sm leading-6 text-ink-soft">Check saved pages on demand. Website access is requested only when a scan starts and is never used for browsing history.</p>
+          {healthSummary ? <p className="mt-3 editorial-index text-[10px] uppercase tracking-wider text-ink-soft">{healthSummary.checked} checked · {healthSummary.healthy} healthy · {healthSummary.broken} broken · {healthSummary.unknown} unknown</p> : null}
+          <Button className="mt-5" disabled={checkingLinks} onClick={() => void runLinkCheck()}>{checkingLinks ? 'Checking…' : 'Check saved links'}</Button>
+        </Panel>
+
+        <Panel icon={<Shield />} index="05" title="Privacy">
+          <p className="text-sm leading-6 text-ink-soft">Local-first storage. No analytics, advertising trackers, or sale of personal data. Vault content is encrypted on this device before it can leave it.</p>
+        </Panel>
+
+        <Panel icon={<Network />} index="06" title="Future Sync Contract">
           <p className="text-sm leading-6 text-ink-soft">
             Sync adapters can consume the same backup envelope, encrypt payloads before transport, resolve conflicts by updated timestamps, and support teams later.
           </p>
