@@ -107,6 +107,7 @@ Users can change global assignments from `chrome://extensions/shortcuts`.
 - Follow [STORE_SUBMISSION.md](STORE_SUBMISSION.md) for build, permission, disclosure, asset, and manual QA instructions.
 - Public privacy policy: https://shivenpatro.github.io/Linkscape-Extension/privacy/
 - Public product and support page: https://shivenpatro.github.io/Linkscape-Extension/
+- One-time owner setup: enable GitHub Pages from the `main` branch's `/docs` folder before using those URLs in the Web Store dashboard.
 - Zip the contents inside `dist/`, not the repository or the enclosing `dist` folder.
 - Never commit or upload real backups, browser profiles, `.env` files, passwords, recovery answers, private keys, or signing material.
 

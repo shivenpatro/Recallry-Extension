@@ -39,6 +39,10 @@ Use these stable public URLs in the listing:
 - Homepage: https://shivenpatro.github.io/Linkscape-Extension/
 - Support: https://github.com/shivenpatro/Linkscape-Extension/issues
 
+### One-Time GitHub Pages Setup
+
+GitHub requires a repository owner to enable Pages before these URLs become public. In the repository, open **Settings → Pages**, choose **Deploy from a branch**, select **main** and **/docs**, then save. Wait for the Pages deployment to complete and verify both the homepage and privacy-policy URL before submitting the extension.
+
 ## Listing Assets
 
 - 128×128 extension icon.
