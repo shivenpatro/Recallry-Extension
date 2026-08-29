@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Privacy policy for the Linkscape Chrome and Edge extension." />
+    <title>Linkscape Privacy Policy</title>
+    <style>
+      :root { color-scheme: light; font-family: Arial, Helvetica, sans-serif; color: #1a1714; background: #f4efe7; }
+      * { box-sizing: border-box; }
+      body { margin: 0; border-top: 8px solid #e63946; }
+      main { width: min(840px, calc(100% - 40px)); margin: 0 auto; padding: 56px 0 80px; }
+      header { padding-bottom: 26px; border-bottom: 2px solid #1a1714; }
+      .index { font: 700 11px/1.4 ui-monospace, monospace; color: #e63946; letter-spacing: .12em; text-transform: uppercase; }
+      h1 { margin: 10px 0 14px; font: 700 clamp(38px, 8vw, 66px)/.95 Georgia, serif; letter-spacing: 0; }
+      h2 { margin: 42px 0 12px; padding-top: 18px; border-top: 1px solid #cfc6ba; font: 700 27px/1.15 Georgia, serif; }
+      p, li { font-size: 16px; line-height: 1.7; }
+      li + li { margin-top: 8px; }
+      code { font: 14px ui-monospace, monospace; }
+      a { color: #c72f3d; text-underline-offset: 3px; }
+      .back { display: inline-block; margin-bottom: 30px; color: inherit; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a class="back" href="../">Back to Linkscape</a>
+      <header>
+        <div class="index">Legal document</div>
+        <h1>Privacy Policy</h1>
+        <p>Effective date: August 30, 2026</p>
+        <p>Linkscape is a local-first Chrome and Edge extension for saving and organizing user-selected website references. It does not require an account or operate developer-controlled analytics, advertising, synchronization, or data-collection services in the current release.</p>
+      </header>
+      <h2>Single Purpose</h2>
+      <p>Linkscape helps users explicitly save, organize, search, protect, back up, and revisit website references as private visual collections.</p>
+      <h2>Information Linkscape Processes</h2>
+      <ul>
+        <li>Page URL, title, domain, favicon, and available preview image for pages the user explicitly saves.</li>
+        <li>Notes, tags, labels, collection names, and other content entered by the user.</li>
+        <li>Save date, ordering, archive state, Trash state, optional script-free snapshots, local backups, imports, exports, and Vault settings.</li>
+        <li>Link-health and HTTP response status when the user explicitly starts a scan.</li>
+      </ul>
+      <p>Linkscape does not read or retain general browsing history. It processes only pages and saved domains involved in a user-requested Linkscape action.</p>
+      <h2>Storage and Data Transfers</h2>
+      <p>Linkscape stores data in the browser profile using IndexedDB and Chrome's memory-backed extension session storage. It does not transmit this information to the developer.</p>
+      <p>Opening a saved link contacts that site. Uncached favicon or preview images may be requested from their source. An on-demand link-health scan contacts only saved origins for which the user granted optional access.</p>
+      <p>Linkscape includes no analytics, advertising, tracking pixels, or remote executable code and does not sell user data.</p>
+      <h2>Chrome Web Store Limited Use</h2>
+      <p>Linkscape's use of information received from Chrome APIs is limited to providing and improving its user-facing save, organization, search, backup, Vault, snapshot, and link-health features.</p>
+      <p>Linkscape does not use or transfer this information for personalized advertising, creditworthiness, lending, or unrelated purposes. It does not permit humans to read user data except with explicit user consent for support, when required for security or legal compliance, or after aggregation and anonymization for internal operations. The current release does not transmit user data to the developer or third parties.</p>
+      <p>Linkscape's use and transfer of information received from Chrome APIs adheres to the Chrome Web Store User Data Policy, including the Limited Use requirements.</p>
+      <h2>Permissions</h2>
+      <ul>
+        <li><code>activeTab</code>: temporary current-page access after the user invokes Linkscape.</li>
+        <li><code>scripting</code>: page metadata capture during that explicit action; no script runs continuously.</li>
+        <li><code>contextMenus</code>: browser-menu save destinations.</li>
+        <li><code>storage</code>: temporary trusted Vault session coordination.</li>
+        <li><code>alarms</code>: local rolling recovery-point scheduling.</li>
+        <li>Optional HTTP(S) access: exact saved origins included in a user-started link-health scan. Users can deny or remove access.</li>
+      </ul>
+      <h2>Vault and Offline Snapshots</h2>
+      <p>Vault Mode encrypts protected links and collection metadata locally with AES-GCM. New password and recovery verification uses PBKDF2-SHA-256. Ordinary collections and exported files are not automatically encrypted.</p>
+      <p>Optional snapshots remove scripts, forms, frames, embedded media, external styles, tracking-capable resources, and unsafe URL schemes. They open in a sandboxed extension reader with network loading disabled and are Vault-encrypted when stored in a protected collection.</p>
+      <h2>Retention and User Control</h2>
+      <ul>
+        <li>Deleted items remain in Trash until restored or permanently deleted.</li>
+        <li>Up to five rolling recovery points remain local.</li>
+        <li>Users can remove saved-site permissions, export data, permanently delete data, clear storage, or uninstall Linkscape.</li>
+      </ul>
+      <p>Exported files are controlled by the user and should be treated as sensitive.</p>
+      <h2>Children</h2>
+      <p>Linkscape is a general productivity tool and is not directed to children under 13.</p>
+      <h2>Changes and Contact</h2>
+      <p>Material changes will appear at this URL with a new effective date. Privacy and security questions can be reported through the official <a href="https://github.com/shivenpatro/Linkscape-Extension">Linkscape repository</a>.</p>
+    </main>
+  </body>
+</html>

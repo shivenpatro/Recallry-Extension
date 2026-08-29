@@ -11,7 +11,8 @@
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
     "lint": "eslint . --ext ts,tsx --max-warnings 0",
-    "smoke:edge": "node scripts/edge-smoke.mjs"
+    "smoke:edge": "node scripts/edge-smoke.mjs",
+    "assets:store": "node scripts/store-assets.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",

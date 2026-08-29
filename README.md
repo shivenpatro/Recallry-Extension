@@ -15,7 +15,7 @@ The project is release-candidate software. Core workflows, data safety, Vault bo
 - Bulk move, tag, archive, delete, and CSV export.
 - Validated JSON backup and atomic restore with import previews, an automatic pre-import checkpoint, and five rolling local recovery points.
 - CSV import/export with spreadsheet-injection protection and hierarchy-preserving Chrome, Edge, and Firefox bookmark HTML import/export.
-- On-demand broken-link checks use an optional website permission requested only when the user starts a scan.
+- On-demand broken-link checks request optional access only to the saved website origins included in a user-started scan. Access can be removed from Settings.
 - Vault Mode with AES-GCM encrypted links and collection metadata, PBKDF2 password and recovery verification, shared session locking, inactivity auto-lock, manual lock, and clean reset.
 - Offline-first IndexedDB storage through Dexie, with an explicit schema migration path.
 
@@ -66,7 +66,7 @@ Vault Mode is local encryption at rest, not an operating-system password manager
 - `contextMenus`: direct save destinations.
 - `storage`: temporary Vault session coordination between trusted extension pages.
 - `alarms`: schedules a daily local recovery point.
-- Optional HTTP(S) host access: requested only when the user starts an on-demand broken-link scan.
+- Optional website access: requested only for the exact saved website origins included when the user starts an on-demand broken-link scan, and removable from Settings.
 
 Linkscape installs without persistent host access, has no always-running page content script, analytics SDK, or remote executable code. Fonts are packaged locally.
 
@@ -83,7 +83,8 @@ npm audit
 ```
 
 The production build is written to `dist/` with source maps disabled.
-On Windows with Microsoft Edge installed, `npm run smoke:edge` loads `dist/` into a clean hidden browser profile and checks desktop/mobile routes plus runtime errors.
+On Windows with Microsoft Edge installed, `npm run smoke:edge` loads `dist/` into a clean hidden Chromium profile and checks desktop/mobile routes plus runtime errors. Current branded Chrome builds no longer support command-line loading of unpacked extensions, so the release checklist also requires a manual clean-profile Chrome pass.
+`npm run assets:store` creates five deterministic 1280x800 screenshots from fictional showcase data in a temporary browser profile. Store artwork is kept in `store-assets/` and is never included in the extension package.
 
 ## Load Unpacked
 
@@ -104,7 +105,8 @@ Users can change global assignments from `chrome://extensions/shortcuts`.
 ## Publishing
 
 - Follow [STORE_SUBMISSION.md](STORE_SUBMISSION.md) for build, permission, disclosure, asset, and manual QA instructions.
-- Host [PRIVACY.md](PRIVACY.md) at a stable public HTTPS URL before submission.
+- Public privacy policy: https://shivenpatro.github.io/Linkscape-Extension/privacy/
+- Public product and support page: https://shivenpatro.github.io/Linkscape-Extension/
 - Zip the contents inside `dist/`, not the repository or the enclosing `dist` folder.
 - Never commit or upload real backups, browser profiles, `.env` files, passwords, recovery answers, private keys, or signing material.
 

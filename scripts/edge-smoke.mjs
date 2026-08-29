@@ -8,13 +8,14 @@ const edgeCandidates = [
   'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
   'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
 ];
-const edge = edgeCandidates.find(existsSync);
-if (!edge) throw new Error('Microsoft Edge was not found');
+const requestedBrowser = 'Edge';
+const browserExecutable = edgeCandidates.find(existsSync);
+if (!browserExecutable) throw new Error(`${requestedBrowser} was not found`);
 
 const extensionPath = resolve('dist');
-const profilePath = join(tmpdir(), `linkscape-edge-smoke-${process.pid}`);
+const profilePath = join(tmpdir(), `linkscape-browser-smoke-${globalThis.process.pid}`);
 const port = 9333 + Math.floor(Math.random() * 300);
-const browser = spawn(edge, [
+const browser = spawn(browserExecutable, [
   '--headless=new',
   `--remote-debugging-port=${port}`,
   `--user-data-dir=${profilePath}`,
@@ -31,11 +32,11 @@ try {
   let worker;
   for (let attempt = 0; attempt < 40 && !worker; attempt += 1) {
     const targets = await cdp.send('Target.getTargets');
-    worker = targets.targetInfos.find((target) => target.type === 'service_worker' && target.url.startsWith('chrome-extension://'));
+    worker = targets.targetInfos.find((target) => target.type === 'service_worker' && target.url.startsWith('chrome-extension://') && target.url.endsWith('/background.js'));
     if (!worker) await delay(250);
   }
   if (!worker) throw new Error('Linkscape service worker did not start');
-  const extensionId = new URL(worker.url).hostname;
+  const extensionId = new globalThis.URL(worker.url).hostname;
   const workerSession = await cdp.send('Target.attachToTarget', { targetId: worker.targetId, flatten: true });
   await cdp.send('Runtime.enable', {}, workerSession.sessionId);
   await cdp.send('Log.enable', {}, workerSession.sessionId);
@@ -75,14 +76,14 @@ try {
 
   const targets = await cdp.send('Target.getTargets');
   const errors = targets.targetInfos.filter((target) => target.type === 'page' && target.url.startsWith('chrome-extension://') && target.title.toLocaleLowerCase().includes('error'));
-  if (errors.length) throw new Error(`Edge reported ${errors.length} extension error page(s)`);
+  if (errors.length) throw new Error(`${requestedBrowser} reported ${errors.length} extension error page(s)`);
   const runtimeErrors = cdp.events.filter((event) => event.method === 'Runtime.exceptionThrown' || (event.method === 'Log.entryAdded' && event.params?.entry?.level === 'error'));
-  if (runtimeErrors.length) throw new Error(`Edge captured ${runtimeErrors.length} extension runtime error(s): ${JSON.stringify(runtimeErrors.slice(0, 3))}`);
-  console.log(JSON.stringify({ ok: true, extensionId, checks: ['service-worker', 'dashboard', 'trash', 'settings', 'spotlight', 'snapshot', 'mobile-390px', 'runtime-errors'] }));
+  if (runtimeErrors.length) throw new Error(`${requestedBrowser} captured ${runtimeErrors.length} extension runtime error(s): ${JSON.stringify(runtimeErrors.slice(0, 3))}`);
+  globalThis.console.log(JSON.stringify({ ok: true, browser: requestedBrowser, extensionId, checks: ['service-worker', 'dashboard', 'trash', 'settings', 'spotlight', 'snapshot', 'mobile-390px', 'runtime-errors'] }));
   await cdp.send('Browser.close');
 } finally {
   if (!browser.killed) browser.kill();
-  if (profilePath.startsWith(tmpdir()) && profilePath.includes('linkscape-edge-smoke-')) await rm(profilePath, { recursive: true, force: true }).catch(() => undefined);
+  if (profilePath.startsWith(tmpdir()) && profilePath.includes('linkscape-browser-smoke-')) await rm(profilePath, { recursive: true, force: true }).catch(() => undefined);
 }
 
 async function openTarget(cdp, url) {
@@ -111,7 +112,7 @@ async function waitForText(cdp, sessionId, expected) {
     expression: '({url:location.href,readyState:document.readyState,title:document.title,text:document.body?.innerText ?? "",html:document.documentElement?.outerHTML?.slice(0,1200) ?? ""})',
     returnByValue: true
   }, sessionId);
-  console.error(JSON.stringify({ expected, state: state.result.value, events: cdp.events.slice(-20) }, null, 2));
+  globalThis.console.error(JSON.stringify({ expected, state: state.result.value, events: cdp.events.slice(-20) }, null, 2));
   throw new Error(`Timed out waiting for ${expected}`);
 }
 
@@ -123,23 +124,23 @@ async function bodyText(cdp, sessionId) {
 async function pollJson(url) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     try {
-      const response = await fetch(url);
+      const response = await globalThis.fetch(url);
       if (response.ok) return response.json();
     } catch {
       // Edge is still starting.
     }
     await delay(250);
   }
-  throw new Error('Edge DevTools endpoint did not start');
+  throw new Error(`${requestedBrowser} DevTools endpoint did not start`);
 }
 
 function connectCdp(url) {
   return new Promise((resolveConnection, rejectConnection) => {
-    const socket = new WebSocket(url);
+    const socket = new globalThis.WebSocket(url);
     const pending = new Map();
     const events = [];
     let nextId = 1;
-    socket.onerror = () => rejectConnection(new Error('Could not connect to Edge DevTools'));
+    socket.onerror = () => rejectConnection(new Error(`Could not connect to ${requestedBrowser} DevTools`));
     socket.onmessage = (event) => {
       const message = JSON.parse(String(event.data));
       if (!message.id) {
@@ -166,5 +167,5 @@ function connectCdp(url) {
 }
 
 function delay(milliseconds) {
-  return new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds));
+  return new Promise((resolveDelay) => globalThis.setTimeout(resolveDelay, milliseconds));
 }

@@ -8,6 +8,7 @@ npm run lint
 npm run test
 npm run build
 npm run smoke:edge
+npm run assets:store
 npm audit
 ```
 
@@ -24,7 +25,7 @@ Linkscape lets users explicitly save, organize, search, protect, import, and exp
 - `contextMenus`: lets users save pages and links directly to a chosen local collection.
 - `storage`: stores the temporary memory-backed Vault session so dashboard, popup, and service worker agree on lock state.
 - `alarms`: creates a daily recovery point inside the extension's local IndexedDB database.
-- Optional HTTP(S) host access: requested from Settings only when the user starts a saved-link health scan; it is not required for install or ordinary capture.
+- Optional website access: requested from Settings only for the exact saved website origins included in a user-started link-health scan. It is not required for install or ordinary capture, and the user can remove it from Settings.
 
 The extension installs without persistent host permissions, has no remote executable code, and has no content script matched to every website.
 
@@ -32,7 +33,11 @@ The extension installs without persistent host permissions, has no remote execut
 
 Disclose website content and browsing activity because Linkscape processes URLs, titles, and page metadata for the user-requested save workflow. Disclose user-generated content because notes, tags, labels, collection names, and imports are stored locally. State that these categories are used only for the extension's single purpose, are not sold, are not used for advertising or credit decisions, and are not transferred to the developer in the current release.
 
-Host `PRIVACY.md` at a stable public HTTPS URL and use that URL in the listing.
+Use these stable public URLs in the listing:
+
+- Privacy policy: https://shivenpatro.github.io/Linkscape-Extension/privacy/
+- Homepage: https://shivenpatro.github.io/Linkscape-Extension/
+- Support: https://github.com/shivenpatro/Linkscape-Extension/issues
 
 ## Listing Assets
 
@@ -58,6 +63,7 @@ Do not advertise cloud sync, public sharing links, collaboration, billing, AI ca
 10. Inspect the service worker and dashboard consoles for errors and run an accessibility keyboard pass.
 11. Save an offline snapshot, disconnect the network, and verify its sandboxed reader opens without external requests.
 12. Start a link-health scan, review the optional permission prompt, and confirm denied access produces no scan.
+13. Remove link-health access from Settings, then confirm another scan asks only for the origins currently represented by saved links.
 
 ## Versioning
 

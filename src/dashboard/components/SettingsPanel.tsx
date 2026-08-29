@@ -4,7 +4,7 @@ import { Activity, Database, Download, History, Network, Shield, ShieldCheck, Up
 import { Button } from '../../components/Button';
 import { createAutomaticBackup, getBackupHealth, restoreAutomaticBackup, type AutomaticBackupRecord } from '../../services/backups';
 import { useLinkscapeStore } from '../../store/linkscapeStore';
-import { checkLinksHealth, requestLinkHealthPermission, type LinkHealthSummary } from '../../services/linkHealth';
+import { checkLinksHealth, removeLinkHealthPermissions, requestLinkHealthPermission, type LinkHealthSummary } from '../../services/linkHealth';
 
 interface SettingsPanelProps {
   onExport: (format: 'json' | 'csv' | 'html') => Promise<void>;
@@ -45,18 +45,24 @@ export function SettingsPanel({ onExport, onImport }: SettingsPanelProps) {
   }
 
   async function runLinkCheck() {
-    if (!await requestLinkHealthPermission()) {
+    const permittedOrigins = await requestLinkHealthPermission(links);
+    if (permittedOrigins.length === 0) {
       window.alert('Website access was not granted. Linkscape did not check any links.');
       return;
     }
     setCheckingLinks(true);
     try {
-      const summary = await checkLinksHealth(links, setHealthSummary);
+      const summary = await checkLinksHealth(links, permittedOrigins, setHealthSummary);
       setHealthSummary(summary);
       await refresh();
     } finally {
       setCheckingLinks(false);
     }
+  }
+
+  async function removeLinkCheckAccess() {
+    const removed = await removeLinkHealthPermissions(links);
+    window.alert(removed ? 'Saved-site access was removed.' : 'There was no saved-site access to remove.');
   }
 
   return (
@@ -122,9 +128,12 @@ export function SettingsPanel({ onExport, onImport }: SettingsPanelProps) {
         </Panel>
 
         <Panel icon={<Activity />} index="04" title="Link Health">
-          <p className="text-sm leading-6 text-ink-soft">Check saved pages on demand. Website access is requested only when a scan starts and is never used for browsing history.</p>
-          {healthSummary ? <p className="mt-3 editorial-index text-[10px] uppercase tracking-wider text-ink-soft">{healthSummary.checked} checked · {healthSummary.healthy} healthy · {healthSummary.broken} broken · {healthSummary.unknown} unknown</p> : null}
-          <Button className="mt-5" disabled={checkingLinks} onClick={() => void runLinkCheck()}>{checkingLinks ? 'Checking…' : 'Check saved links'}</Button>
+          <p className="text-sm leading-6 text-ink-soft">Check saved pages on demand. Linkscape requests access only to saved domains included in the scan and never reads browsing history.</p>
+          {healthSummary ? <p className="mt-3 editorial-index text-[10px] uppercase tracking-wider text-ink-soft">{healthSummary.checked} checked · {healthSummary.healthy} healthy · {healthSummary.broken} broken · {healthSummary.unknown} unknown · {healthSummary.skipped} skipped</p> : null}
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button disabled={checkingLinks} onClick={() => void runLinkCheck()}>{checkingLinks ? 'Checking…' : 'Check saved links'}</Button>
+            <Button variant="ghost" disabled={checkingLinks} onClick={() => void removeLinkCheckAccess()}>Remove access</Button>
+          </div>
         </Panel>
 
         <Panel icon={<Shield />} index="05" title="Privacy">
