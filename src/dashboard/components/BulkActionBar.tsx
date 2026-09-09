@@ -6,8 +6,10 @@ import { Button } from '../../components/Button';
 import { exportLinksAsCsv } from '../../services/importExport';
 import { downloadText } from '../../shared/utils';
 import { isVaultUnlocked } from '../../services/vault';
+import { useDialog } from '../../components/DialogProvider';
 
 export function BulkActionBar() {
+  const { confirm, prompt: promptDialog } = useDialog();
   const selected = useRecallryStore((state) => state.selectedLinkIds);
   const allCollections = useRecallryStore((state) => state.collections);
   const allLinks = useRecallryStore((state) => state.links);
@@ -23,7 +25,7 @@ export function BulkActionBar() {
   const selectedAreTrashed = selectedLinks.length > 0 && selectedLinks.every((link) => Boolean(link.deletedAt));
 
   async function tagSelected() {
-    const tag = prompt('Tag selected cards');
+    const tag = await promptDialog({ title: 'Tag selected cards', inputLabel: 'Tag', required: true, confirmLabel: 'Apply tag' });
     if (!tag?.trim()) return;
     await tagSelectedLinks(tag);
   }
@@ -74,11 +76,13 @@ export function BulkActionBar() {
             Archive
           </Button> : null}
           {selectedAreTrashed ? <Button variant="ghost" onClick={() => void restoreSelectedLinks()}><RotateCcw className="h-3.5 w-3.5" /> Restore</Button> : null}
-          <Button variant="danger" onClick={() => {
+          <Button variant="danger" onClick={async () => {
             if (selectedAreTrashed) {
-              if (window.confirm(`Permanently delete ${selected.length} selected ${selected.length === 1 ? 'card' : 'cards'}? This cannot be undone.`)) void permanentlyDeleteSelectedLinks();
-            } else if (window.confirm(`Move ${selected.length} selected ${selected.length === 1 ? 'card' : 'cards'} to Trash?`)) {
-              void deleteSelectedLinks();
+              const approved = await confirm({ title: 'Delete selected cards forever?', message: `${selected.length} selected ${selected.length === 1 ? 'card' : 'cards'} will be permanently deleted. This cannot be undone.`, confirmLabel: 'Delete forever', tone: 'danger' });
+              if (approved) await permanentlyDeleteSelectedLinks();
+            } else {
+              const approved = await confirm({ title: 'Move selected cards to Trash?', message: `${selected.length} selected ${selected.length === 1 ? 'card' : 'cards'} will be moved to Trash.`, confirmLabel: 'Move to Trash', tone: 'danger' });
+              if (approved) await deleteSelectedLinks();
             }
           }}>
             <Trash2 className="h-3.5 w-3.5" />

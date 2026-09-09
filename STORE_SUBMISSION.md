@@ -14,6 +14,8 @@ npm audit
 
 Review `dist/manifest.json`, then zip the contents inside `dist/`. Do not include source files, source maps, `node_modules`, browser profiles, backups, environment files, private keys, passwords, or recovery answers.
 
+Every push to `main` also runs the public `Recallry release checks` workflow. Download the `recallry-chrome-<commit>` artifact only after both the verification and Edge smoke-test jobs pass.
+
 ## Single Purpose
 
 Recallry lets users explicitly save, organize, search, protect, import, and export website references as local visual collections.

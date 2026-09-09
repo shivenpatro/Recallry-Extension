@@ -9,6 +9,7 @@ import { cn } from '../../shared/utils';
 import { useRecallryStore } from '../../store/recallryStore';
 import { isVaultUnlocked } from '../../services/vault';
 import { DEFAULT_COLLECTION_ID } from '../../shared/constants';
+import { useDialog } from '../../components/DialogProvider';
 
 interface CollectionCardProps {
   collection: Collection;
@@ -19,6 +20,7 @@ interface CollectionCardProps {
 }
 
 export function CollectionCard({ collection, count, index, onOpen, onOpenVault }: CollectionCardProps) {
+  const { alert, confirm, prompt: promptDialog } = useDialog();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: collection.id });
   const updateCollection = useRecallryStore((state) => state.updateCollection);
   const duplicateCollection = useRecallryStore((state) => state.duplicateCollection);
@@ -35,14 +37,14 @@ export function CollectionCard({ collection, count, index, onOpen, onOpenVault }
   };
 
   async function editDetails() {
-    const description = prompt('Collection description', collection.description);
+    const description = await promptDialog({ title: 'Edit collection details', inputLabel: 'Description', initialValue: collection.description, multiline: true, confirmLabel: 'Continue' });
     if (description === null) return;
-    const icon = prompt('Icon name', collection.icon);
+    const icon = await promptDialog({ title: 'Choose an icon', inputLabel: 'Icon name', initialValue: collection.icon, placeholder: 'Folder', confirmLabel: 'Continue' });
     if (icon === null) return;
-    const theme = prompt(`Color theme (${Object.keys(COLLECTION_THEMES).join(', ')})`, collection.theme);
+    const theme = await promptDialog({ title: 'Choose a color theme', message: Object.keys(COLLECTION_THEMES).join(', '), inputLabel: 'Theme', initialValue: collection.theme, required: true, confirmLabel: 'Save details' });
     if (theme === null) return;
     if (!(theme in COLLECTION_THEMES)) {
-      window.alert('Choose one of the listed color themes.');
+      await alert({ title: 'Unknown color theme', message: 'Choose one of the listed color themes.' });
       return;
     }
     await updateCollection(collection.id, { description: description.trim(), icon: icon.trim() || 'Folder', theme: theme as Collection['theme'] });
@@ -119,9 +121,9 @@ export function CollectionCard({ collection, count, index, onOpen, onOpenVault }
             {({ active }) => (
               <button
                 className={cn('flex w-full items-center gap-3 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition', active ? 'bg-ink text-paper' : 'text-ink')}
-                onClick={() => {
-                  const title = prompt('Collection name', collection.title);
-                  if (title?.trim()) void updateCollection(collection.id, { title: title.trim() });
+                onClick={async () => {
+                  const title = await promptDialog({ title: 'Rename collection', inputLabel: 'Collection name', initialValue: collection.title, required: true, confirmLabel: 'Rename' });
+                  if (title?.trim()) await updateCollection(collection.id, { title: title.trim() });
                 }}
               >
                 <Pencil className="h-3.5 w-3.5" /> Rename
@@ -200,11 +202,13 @@ export function CollectionCard({ collection, count, index, onOpen, onOpenVault }
             {({ active }) => (
               <button
                 className={cn('flex w-full items-center gap-3 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition', active ? 'bg-vermillion text-paper' : 'text-vermillion')}
-                onClick={() => {
+                onClick={async () => {
                   if (isTrashed) {
-                    if (window.confirm(`Permanently delete “${collection.title}” and every card inside it? This cannot be undone.`)) void permanentlyDeleteCollection(collection.id);
-                  } else if (window.confirm(`Move “${collection.title}” and every card inside it to Trash?`)) {
-                    void deleteCollection(collection.id);
+                    const approved = await confirm({ title: `Delete “${collection.title}” forever?`, message: 'The collection and every card inside it will be permanently deleted. This cannot be undone.', confirmLabel: 'Delete forever', tone: 'danger' });
+                    if (approved) await permanentlyDeleteCollection(collection.id);
+                  } else {
+                    const approved = await confirm({ title: `Move “${collection.title}” to Trash?`, message: 'Every card inside this collection will move with it.', confirmLabel: 'Move to Trash', tone: 'danger' });
+                    if (approved) await deleteCollection(collection.id);
                   }
                 }}
               >

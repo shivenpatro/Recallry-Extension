@@ -5,8 +5,10 @@ import { KeyRound, Lock, ShieldCheck, Timer, Unlock } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { configureVaultRecovery, createVault, isVaultUnlocked, lockVault, resetVault, resetVaultPassword, unlockVault, updateVaultAutoLock } from '../../services/vault';
 import { useRecallryStore } from '../../store/recallryStore';
+import { useDialog } from '../../components/DialogProvider';
 
 export function VaultPanel() {
+  const { confirm, prompt: promptDialog } = useDialog();
   const vault = useRecallryStore((state) => state.vault);
   const refresh = useRecallryStore((state) => state.refresh);
   const [password, setPassword] = useState('');
@@ -83,9 +85,9 @@ export function VaultPanel() {
   }
 
   async function handleResetVault() {
-    const confirmed = window.confirm('Reset Vault? Locked or encrypted collections cannot be recovered without the old password and will be permanently deleted. Unprotected collections will remain.');
+    const confirmed = await confirm({ title: 'Reset Vault?', message: 'Locked or encrypted collections will be permanently deleted and cannot be recovered without the old password. Unprotected collections will remain.', confirmLabel: 'Continue to verification', tone: 'danger' });
     if (!confirmed) return;
-    const confirmation = window.prompt('Type RESET VAULT to continue');
+    const confirmation = await promptDialog({ title: 'Verify Vault reset', message: 'This is the final confirmation.', inputLabel: 'Type RESET VAULT', required: true, confirmLabel: 'Reset Vault', tone: 'danger', validate: (value) => value === 'RESET VAULT' ? undefined : 'Enter RESET VAULT exactly to continue.' });
     if (confirmation !== 'RESET VAULT') {
       setMessage('Vault reset cancelled');
       return;

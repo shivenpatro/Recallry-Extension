@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Recallry - Visual Web Library",
   "short_name": "Recallry",
-  "description": "A premium, local-first visual collection manager for the modern web.",
+  "description": "A private, local-first visual library for saving and organizing the modern web.",
   "version": "1.0.0",
   "minimum_chrome_version": "114",
   "action": {

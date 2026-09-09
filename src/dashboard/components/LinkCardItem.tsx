@@ -8,6 +8,7 @@ import type { LinkCard } from '../../shared/types';
 import { cn } from '../../shared/utils';
 import { useRecallryStore } from '../../store/recallryStore';
 import { isVaultUnlocked } from '../../services/vault';
+import { useDialog } from '../../components/DialogProvider';
 
 interface LinkCardItemProps {
   link: LinkCard;
@@ -15,6 +16,7 @@ interface LinkCardItemProps {
 }
 
 export function LinkCardItem({ link, selected }: LinkCardItemProps) {
+  const { alert, confirm, prompt: promptDialog } = useDialog();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: link.id });
   const [expanded, setExpanded] = useState(false);
   const toggle = useRecallryStore((state) => state.toggleLinkSelection);
@@ -27,9 +29,9 @@ export function LinkCardItem({ link, selected }: LinkCardItemProps) {
   const collections = useRecallryStore((state) => state.collections);
   const style = { transform: CSS.Transform.toString(transform), transition };
 
-  function openLink() {
+  async function openLink() {
     if (link.isVaultProtected && !isVaultUnlocked()) {
-      window.alert('Unlock Vault before opening this protected link.');
+      await alert({ title: 'Vault is locked', message: 'Unlock Vault before opening this protected link.' });
       return;
     }
     const extensionApi = (globalThis as { chrome?: typeof chrome }).chrome;
@@ -50,19 +52,19 @@ export function LinkCardItem({ link, selected }: LinkCardItemProps) {
   }
 
   async function editNotes() {
-    const notes = prompt('Notes', link.notes);
+    const notes = await promptDialog({ title: 'Edit notes', inputLabel: 'Notes', initialValue: link.notes, multiline: true, confirmLabel: 'Save notes' });
     if (notes === null) return;
     await updateLink(link.id, { notes });
   }
 
   async function editTags() {
-    const tags = prompt('Tags separated by commas', link.tags.join(', '));
+    const tags = await promptDialog({ title: 'Edit tags', inputLabel: 'Comma-separated tags', initialValue: link.tags.join(', '), placeholder: 'research, design', confirmLabel: 'Save tags' });
     if (tags === null) return;
     await updateLink(link.id, { tags: tags.split(',').map((tag) => tag.trim().toLocaleLowerCase()).filter(Boolean) });
   }
 
   async function editLabels() {
-    const labels = prompt('Labels separated by commas', link.labels.join(', '));
+    const labels = await promptDialog({ title: 'Edit labels', inputLabel: 'Comma-separated labels', initialValue: link.labels.join(', '), confirmLabel: 'Save labels' });
     if (labels === null) return;
     await updateLink(link.id, { labels: labels.split(',').map((label) => label.trim().toLocaleLowerCase()).filter(Boolean) });
   }
@@ -70,14 +72,14 @@ export function LinkCardItem({ link, selected }: LinkCardItemProps) {
   async function moveCard() {
     const destinations = collections.filter((collection) => collection.status === 'active' && collection.id !== link.collectionId && (!collection.isVaultProtected || isVaultUnlocked()));
     if (destinations.length === 0) {
-      window.alert('Create another accessible collection before moving this card.');
+      await alert({ title: 'No destination available', message: 'Create another accessible collection before moving this card.' });
       return;
     }
-    const choice = prompt(`Move to:\n${destinations.map((collection, index) => `${index + 1}. ${collection.title}`).join('\n')}\n\nEnter a number`);
+    const choice = await promptDialog({ title: 'Move card', message: destinations.map((collection, index) => `${index + 1}. ${collection.title}`).join('\n'), inputLabel: 'Destination number', required: true, confirmLabel: 'Move card' });
     if (choice === null) return;
     const destination = destinations[Number(choice) - 1];
     if (!destination) {
-      window.alert('Choose a valid collection number.');
+      await alert({ title: 'Invalid destination', message: 'Choose a collection number from the list.' });
       return;
     }
     await moveLink(link.id, destination.id);
@@ -185,11 +187,13 @@ export function LinkCardItem({ link, selected }: LinkCardItemProps) {
             </Action>
             <Action
               title={link.deletedAt ? 'Delete forever' : 'Move to Trash'}
-              onClick={() => {
+              onClick={async () => {
                 if (link.deletedAt) {
-                  if (window.confirm(`Permanently delete “${link.title}”? This cannot be undone.`)) void permanentlyDeleteLink(link.id);
-                } else if (window.confirm(`Move “${link.title}” to Trash?`)) {
-                  void deleteLink(link.id);
+                  const approved = await confirm({ title: `Delete “${link.title}” forever?`, message: 'This card will be permanently deleted. This cannot be undone.', confirmLabel: 'Delete forever', tone: 'danger' });
+                  if (approved) await permanentlyDeleteLink(link.id);
+                } else {
+                  const approved = await confirm({ title: `Move “${link.title}” to Trash?`, confirmLabel: 'Move to Trash', tone: 'danger' });
+                  if (approved) await deleteLink(link.id);
                 }
               }}
             >
@@ -278,11 +282,13 @@ export function LinkCardItem({ link, selected }: LinkCardItemProps) {
                   {({ active }) => (
                     <button
                       className={cn('flex w-full items-center gap-2.5 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider transition', active ? 'bg-vermillion text-paper' : 'text-vermillion')}
-                      onClick={() => {
+                      onClick={async () => {
                         if (link.deletedAt) {
-                          if (window.confirm(`Permanently delete “${link.title}”? This cannot be undone.`)) void permanentlyDeleteLink(link.id);
-                        } else if (window.confirm(`Move “${link.title}” to Trash?`)) {
-                          void deleteLink(link.id);
+                          const approved = await confirm({ title: `Delete “${link.title}” forever?`, message: 'This card will be permanently deleted. This cannot be undone.', confirmLabel: 'Delete forever', tone: 'danger' });
+                          if (approved) await permanentlyDeleteLink(link.id);
+                        } else {
+                          const approved = await confirm({ title: `Move “${link.title}” to Trash?`, confirmLabel: 'Move to Trash', tone: 'danger' });
+                          if (approved) await deleteLink(link.id);
                         }
                       }}
                     >

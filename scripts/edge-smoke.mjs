@@ -48,6 +48,18 @@ try {
     if (!initialText.includes(label)) throw new Error(`Dashboard is missing ${label}`);
   }
 
+  await clickButton(cdp, dashboard, 'Collection');
+  await waitForText(cdp, dashboard, 'New collection');
+  const dialogState = await cdp.send('Runtime.evaluate', {
+    expression: '({modal:document.querySelector(`[role="dialog"]`)?.getAttribute("aria-modal"),focused:document.activeElement?.tagName})',
+    returnByValue: true
+  }, dashboard);
+  if (dialogState.result.value.modal !== 'true' || dialogState.result.value.focused !== 'INPUT') throw new Error('Collection dialog is not accessible or did not focus its input');
+  await cdp.send('Runtime.evaluate', {
+    expression: "window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))"
+  }, dashboard);
+  await waitForTextGone(cdp, dashboard, 'New collection');
+
   await clickButton(cdp, dashboard, 'Trash');
   await waitForText(cdp, dashboard, 'Trash is empty');
   await clickButton(cdp, dashboard, 'Settings');
@@ -79,7 +91,7 @@ try {
   if (errors.length) throw new Error(`${requestedBrowser} reported ${errors.length} extension error page(s)`);
   const runtimeErrors = cdp.events.filter((event) => event.method === 'Runtime.exceptionThrown' || (event.method === 'Log.entryAdded' && event.params?.entry?.level === 'error'));
   if (runtimeErrors.length) throw new Error(`${requestedBrowser} captured ${runtimeErrors.length} extension runtime error(s): ${JSON.stringify(runtimeErrors.slice(0, 3))}`);
-  globalThis.console.log(JSON.stringify({ ok: true, browser: requestedBrowser, extensionId, checks: ['service-worker', 'dashboard', 'trash', 'settings', 'spotlight', 'snapshot', 'mobile-390px', 'runtime-errors'] }));
+  globalThis.console.log(JSON.stringify({ ok: true, browser: requestedBrowser, extensionId, checks: ['service-worker', 'dashboard', 'dialogs', 'trash', 'settings', 'spotlight', 'snapshot', 'mobile-390px', 'runtime-errors'] }));
   await cdp.send('Browser.close');
 } finally {
   if (!browser.killed) browser.kill();
@@ -114,6 +126,14 @@ async function waitForText(cdp, sessionId, expected) {
   }, sessionId);
   globalThis.console.error(JSON.stringify({ expected, state: state.result.value, events: cdp.events.slice(-20) }, null, 2));
   throw new Error(`Timed out waiting for ${expected}`);
+}
+
+async function waitForTextGone(cdp, sessionId, expected) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    if (!(await bodyText(cdp, sessionId)).includes(expected)) return;
+    await delay(200);
+  }
+  throw new Error(`Timed out waiting for ${expected} to close`);
 }
 
 async function bodyText(cdp, sessionId) {

@@ -15,8 +15,10 @@ import {
 import type { Collection, LinkCapture } from '../shared/types';
 import { captureActiveTab } from '../services/capture';
 import { isVaultUnlocked, restoreVaultSession } from '../services/vault';
+import { useDialog } from '../components/DialogProvider';
 
 export function PopupApp() {
+  const { prompt: promptDialog } = useDialog();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [capture, setCapture] = useState<LinkCapture | null>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState('');
@@ -88,7 +90,7 @@ export function PopupApp() {
   }
 
   async function saveToNewCollection() {
-    const title = prompt('New collection name');
+    const title = await promptDialog({ title: 'New collection', inputLabel: 'Collection name', required: true, confirmLabel: 'Create and save' });
     if (!title?.trim() || !capture) return;
     setStatus('saving');
     setErrorMessage('');

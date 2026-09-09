@@ -28,10 +28,12 @@ import { BulkActionBar } from './components/BulkActionBar';
 import { VaultPanel } from './components/VaultPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { isVaultUnlocked, lockVault, touchVaultSession } from '../services/vault';
+import { useDialog } from '../components/DialogProvider';
 
 type ViewMode = 'collections' | 'collection' | 'favorites' | 'archived' | 'trash' | 'vault' | 'settings';
 
 export function DashboardApp() {
+  const { alert, confirm, prompt: promptDialog } = useDialog();
   const {
     collections,
     links,
@@ -142,7 +144,7 @@ export function DashboardApp() {
   const trashedLinks = links.filter((link) => link.deletedAt && !link.deletedWithCollectionId && (!link.isVaultProtected || vaultUnlocked));
 
   async function handleCreateCollection() {
-    const title = prompt('Collection name');
+    const title = await promptDialog({ title: 'New collection', inputLabel: 'Collection name', required: true, confirmLabel: 'Create' });
     if (!title?.trim()) return;
     await createCollection(title.trim());
     setViewMode('collection');
@@ -165,7 +167,22 @@ export function DashboardApp() {
 
   async function handleAddWebsite(collectionId = selectedCollection?.id) {
     if (!collectionId) return;
-    const rawUrl = prompt('Website URL');
+    const rawUrl = await promptDialog({
+      title: 'Add a website',
+      inputLabel: 'Website URL',
+      placeholder: 'example.com/article',
+      required: true,
+      confirmLabel: 'Continue',
+      validate: (value) => {
+        try {
+          const candidate = /^https?:\/\//i.test(value.trim()) ? value.trim() : `https://${value.trim()}`;
+          const parsed = new URL(candidate);
+          return ['http:', 'https:'].includes(parsed.protocol) ? undefined : 'Only http(s) website URLs are supported.';
+        } catch {
+          return 'Enter a valid website URL.';
+        }
+      }
+    });
     if (!rawUrl?.trim()) return;
     const normalizedUrl = /^https?:\/\//i.test(rawUrl.trim()) ? rawUrl.trim() : `https://${rawUrl.trim()}`;
     let parsedUrl: URL;
@@ -173,13 +190,15 @@ export function DashboardApp() {
       parsedUrl = new URL(normalizedUrl);
       if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error('Unsupported protocol');
     } catch {
-      window.alert('Enter a valid http(s) website URL.');
+      await alert({ title: 'Invalid website URL', message: 'Enter a valid http(s) website URL.' });
       return;
     }
-    const title = prompt('Card title', parsedUrl.hostname.replace(/^www\./, ''));
+    const title = await promptDialog({ title: 'Name this card', inputLabel: 'Card title', initialValue: parsedUrl.hostname.replace(/^www\./, ''), required: true, confirmLabel: 'Continue' });
     if (title === null) return;
-    const notes = prompt('Notes (optional)', '') ?? '';
-    const tagInput = prompt('Tags separated by commas (optional)', '') ?? '';
+    const notes = await promptDialog({ title: 'Add notes', inputLabel: 'Notes (optional)', multiline: true, confirmLabel: 'Continue' });
+    if (notes === null) return;
+    const tagInput = await promptDialog({ title: 'Add tags', inputLabel: 'Comma-separated tags (optional)', placeholder: 'research, design', confirmLabel: 'Save website' });
+    if (tagInput === null) return;
     try {
       await saveLink(
         collectionId,
@@ -193,7 +212,7 @@ export function DashboardApp() {
         tagInput.split(',').map((tag) => tag.trim().toLocaleLowerCase()).filter(Boolean)
       );
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'The website could not be saved');
+      await alert({ title: 'Website could not be saved', message: error instanceof Error ? error.message : 'Please try again.' });
     }
   }
 
@@ -238,7 +257,8 @@ export function DashboardApp() {
       const previewMessage = preview.kind === 'backup'
         ? `Restore ${preview.collections} collections and ${preview.links} cards from this backup? Your current data will be downloaded and checkpointed first.`
         : `Import ${preview.links} websites${preview.collections ? ` and ${preview.collections} folders` : ''} into the selected collection?${preview.skipped ? ` ${preview.skipped} invalid rows will be skipped.` : ''}`;
-      if (!window.confirm(previewMessage)) return;
+      const approved = await confirm({ title: preview.kind === 'backup' ? 'Restore this backup?' : 'Import these websites?', message: previewMessage, confirmLabel: preview.kind === 'backup' ? 'Restore backup' : 'Import websites' });
+      if (!approved) return;
       await createAutomaticBackup('before-import');
       if (filename.endsWith('.json')) {
         downloadText(`recallry-before-restore-${new Date().toISOString().slice(0, 10)}.json`, 'application/json', await exportAsJson());
@@ -249,7 +269,7 @@ export function DashboardApp() {
       }
       await refresh();
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Import failed');
+      await alert({ title: 'Import failed', message: error instanceof Error ? error.message : 'The selected file could not be imported.' });
     }
   }
 

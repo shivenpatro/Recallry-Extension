@@ -4,6 +4,7 @@ import type { Collection } from '../../shared/types';
 import { cn } from '../../shared/utils';
 import { IconGlyph } from '../../components/IconGlyph';
 import { useRecallryStore } from '../../store/recallryStore';
+import { useDialog } from '../../components/DialogProvider';
 
 interface SidebarProps {
   collections: Collection[];
@@ -14,11 +15,12 @@ interface SidebarProps {
 }
 
 export function Sidebar({ collections, selectedId, viewMode, onSelectCollection, onSelectView }: SidebarProps) {
+  const { prompt: promptDialog } = useDialog();
   const createCollection = useRecallryStore((state) => state.createCollection);
   const moveLink = useRecallryStore((state) => state.moveLink);
 
   async function addNestedCollection() {
-    const title = prompt('Nested collection name');
+    const title = await promptDialog({ title: 'New nested collection', inputLabel: 'Collection name', required: true, confirmLabel: 'Create' });
     if (!title?.trim()) return;
     await createCollection(title.trim(), selectedId);
   }

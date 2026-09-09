@@ -5,6 +5,7 @@ import { Button } from '../../components/Button';
 import { createAutomaticBackup, getBackupHealth, restoreAutomaticBackup, type AutomaticBackupRecord } from '../../services/backups';
 import { useRecallryStore } from '../../store/recallryStore';
 import { checkLinksHealth, removeLinkHealthPermissions, requestLinkHealthPermission, type LinkHealthSummary } from '../../services/linkHealth';
+import { useDialog } from '../../components/DialogProvider';
 
 interface SettingsPanelProps {
   onExport: (format: 'json' | 'csv' | 'html') => Promise<void>;
@@ -12,6 +13,7 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ onExport, onImport }: SettingsPanelProps) {
+  const { alert, confirm } = useDialog();
   const refresh = useRecallryStore((state) => state.refresh);
   const links = useRecallryStore((state) => state.links);
   const [backupStatus, setBackupStatus] = useState<'loading' | 'healthy' | 'stale' | 'missing'>('loading');
@@ -37,7 +39,9 @@ export function SettingsPanel({ onExport, onImport }: SettingsPanelProps) {
   }
 
   async function restoreLatest() {
-    if (!latestBackup || !window.confirm(`Restore the recovery point from ${new Date(latestBackup.createdAt).toLocaleString()}? A new checkpoint will be created first.`)) return;
+    if (!latestBackup) return;
+    const approved = await confirm({ title: 'Restore this recovery point?', message: `Restore the checkpoint from ${new Date(latestBackup.createdAt).toLocaleString()}? Recallry will create a new checkpoint first.`, confirmLabel: 'Restore checkpoint' });
+    if (!approved) return;
     await createAutomaticBackup('manual');
     await restoreAutomaticBackup(latestBackup.id);
     await refresh();
@@ -47,7 +51,7 @@ export function SettingsPanel({ onExport, onImport }: SettingsPanelProps) {
   async function runLinkCheck() {
     const permittedOrigins = await requestLinkHealthPermission(links);
     if (permittedOrigins.length === 0) {
-      window.alert('Website access was not granted. Recallry did not check any links.');
+      await alert({ title: 'Website access not granted', message: 'Recallry did not check any saved links. You can try again and approve access only to the listed saved sites.' });
       return;
     }
     setCheckingLinks(true);
@@ -62,7 +66,7 @@ export function SettingsPanel({ onExport, onImport }: SettingsPanelProps) {
 
   async function removeLinkCheckAccess() {
     const removed = await removeLinkHealthPermissions(links);
-    window.alert(removed ? 'Saved-site access was removed.' : 'There was no saved-site access to remove.');
+    await alert({ title: removed ? 'Website access removed' : 'No website access to remove', message: removed ? 'Recallry can no longer check the previously approved saved sites.' : 'Recallry does not currently have saved-site access.' });
   }
 
   return (
