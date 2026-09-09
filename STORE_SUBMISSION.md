@@ -16,11 +16,11 @@ Review `dist/manifest.json`, then zip the contents inside `dist/`. Do not includ
 
 ## Single Purpose
 
-Linkscape lets users explicitly save, organize, search, protect, import, and export website references as local visual collections.
+Recallry lets users explicitly save, organize, search, protect, import, and export website references as local visual collections.
 
 ## Permission Justifications
 
-- `activeTab`: reads the active page URL and metadata only when the user opens Linkscape or invokes a save command.
+- `activeTab`: reads the active page URL and metadata only when the user opens Recallry or invokes a save command.
 - `scripting`: extracts the title, favicon, and available Open Graph/Twitter preview image during an explicit capture action. No script runs continuously.
 - `contextMenus`: lets users save pages and links directly to a chosen local collection.
 - `storage`: stores the temporary memory-backed Vault session so dashboard, popup, and service worker agree on lock state.
@@ -31,13 +31,13 @@ The extension installs without persistent host permissions, has no remote execut
 
 ## Data-Use Disclosure
 
-Disclose website content and browsing activity because Linkscape processes URLs, titles, and page metadata for the user-requested save workflow. Disclose user-generated content because notes, tags, labels, collection names, and imports are stored locally. State that these categories are used only for the extension's single purpose, are not sold, are not used for advertising or credit decisions, and are not transferred to the developer in the current release.
+Disclose website content and browsing activity because Recallry processes URLs, titles, and page metadata for the user-requested save workflow. Disclose user-generated content because notes, tags, labels, collection names, and imports are stored locally. State that these categories are used only for the extension's single purpose, are not sold, are not used for advertising or credit decisions, and are not transferred to the developer in the current release.
 
 Use these stable public URLs in the listing:
 
-- Privacy policy: https://shivenpatro.github.io/Linkscape-Extension/privacy/
-- Homepage: https://shivenpatro.github.io/Linkscape-Extension/
-- Support: https://github.com/shivenpatro/Linkscape-Extension/issues
+- Privacy policy: https://shivenpatro.github.io/Recallry-Extension/privacy/
+- Homepage: https://shivenpatro.github.io/Recallry-Extension/
+- Support: https://github.com/shivenpatro/Recallry-Extension/issues
 
 ### One-Time GitHub Pages Setup
 
@@ -60,7 +60,7 @@ Do not advertise cloud sync, public sharing links, collaboration, billing, AI ca
 3. Confirm restricted pages show a clear error and never create placeholder data.
 4. Exercise collection edit, duplicate, reorder, nesting, favorite, archive, protection, Trash, Restore, and permanent deletion.
 5. Add a card without a preview and verify selection, drag, actions, archive, restore, move, labels, Trash, and permanent deletion.
-6. Import representative Chrome, Edge, Firefox, CSV, and Linkscape backup files. Verify previews, reject malformed files, and restore an automatic recovery point.
+6. Import representative Chrome, Edge, Firefox, CSV, and Recallry backup files. Verify previews, reject malformed files, and restore an automatic recovery point.
 7. Create a Vault, configure recovery, protect a populated collection, lock it, and verify dashboard, sidebar, popup, search, and keyboard access remain blocked.
 8. Unlock in the dashboard and save to a protected collection from the popup. Confirm manual and inactivity locking affect every extension page.
 9. Restart the browser and verify the Vault starts locked while unprotected data remains available offline.

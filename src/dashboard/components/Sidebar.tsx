@@ -3,7 +3,7 @@ import { Archive, Boxes, Heart, Lock, Plus, Settings, Trash2 } from 'lucide-reac
 import type { Collection } from '../../shared/types';
 import { cn } from '../../shared/utils';
 import { IconGlyph } from '../../components/IconGlyph';
-import { useLinkscapeStore } from '../../store/linkscapeStore';
+import { useRecallryStore } from '../../store/recallryStore';
 
 interface SidebarProps {
   collections: Collection[];
@@ -14,8 +14,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ collections, selectedId, viewMode, onSelectCollection, onSelectView }: SidebarProps) {
-  const createCollection = useLinkscapeStore((state) => state.createCollection);
-  const moveLink = useLinkscapeStore((state) => state.moveLink);
+  const createCollection = useRecallryStore((state) => state.createCollection);
+  const moveLink = useRecallryStore((state) => state.moveLink);
 
   async function addNestedCollection() {
     const title = prompt('Nested collection name');
@@ -32,7 +32,7 @@ export function Sidebar({ collections, selectedId, viewMode, onSelectCollection,
         <div className="editorial-index text-[10px] font-semibold uppercase tracking-[0.2em] text-vermillion">
           Issue 01 · 2026
         </div>
-        <div className="mt-1 font-display text-3xl font-medium leading-none tracking-tightest text-ink">Linkscape</div>
+        <div className="mt-1 font-display text-3xl font-medium leading-none tracking-tightest text-ink">Recallry</div>
         <div className="mt-1.5 text-xs italic text-ink-soft">A private archive</div>
       </div>
 
@@ -69,7 +69,7 @@ export function Sidebar({ collections, selectedId, viewMode, onSelectCollection,
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
                 event.preventDefault();
-                const linkId = event.dataTransfer.getData('application/x-linkscape-link');
+                const linkId = event.dataTransfer.getData('application/x-recallry-link');
                 if (linkId) void moveLink(linkId, collection.id);
               }}
               style={{ paddingLeft: `${0.75 + Math.min(depth, 4) * 1.1}rem` }}

@@ -7,8 +7,8 @@ describe('page capture', () => {
   });
 
   it('resolves relative preview images against the page URL', () => {
-    window.history.replaceState({}, '', '/articles/linkscape');
-    document.title = 'Linkscape article';
+    window.history.replaceState({}, '', '/articles/recallry');
+    document.title = 'Recallry article';
     document.head.insertAdjacentHTML('beforeend', '<meta property="og:image" content="/images/preview.png">');
     expect(captureFromDocument().thumbnailUrl).toBe(`${window.location.origin}/images/preview.png`);
   });

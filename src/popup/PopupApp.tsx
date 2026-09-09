@@ -101,7 +101,7 @@ export function PopupApp() {
       setLastSavedLinkId(link.id);
       setRecentCollectionIds(await listRecentCollectionIds());
       setStatus('saved');
-      void chrome?.runtime?.sendMessage?.({ type: 'LINKSCAPE_REFRESH_CONTEXT_MENUS' });
+      void chrome?.runtime?.sendMessage?.({ type: 'RECALLRY_REFRESH_CONTEXT_MENUS' });
     } catch (error) {
       setStatus('error');
       setErrorMessage(error instanceof Error ? error.message : 'The collection could not be created');
@@ -118,7 +118,7 @@ export function PopupApp() {
   function openDashboard() {
     const extensionApi = (globalThis as { chrome?: typeof chrome }).chrome;
     if (extensionApi?.runtime?.sendMessage) {
-      void extensionApi.runtime.sendMessage({ type: 'LINKSCAPE_OPEN_DASHBOARD' });
+      void extensionApi.runtime.sendMessage({ type: 'RECALLRY_OPEN_DASHBOARD' });
       window.close();
     } else {
       window.open('/dashboard.html', '_blank');
@@ -131,7 +131,7 @@ export function PopupApp() {
       <div className="mb-4 flex items-center justify-between border-b-2 border-ink pb-3">
         <div>
           <div className="editorial-index text-[9px] font-semibold uppercase tracking-[0.2em] text-vermillion">Issue 01 · 2026</div>
-          <h1 className="font-display text-2xl font-medium leading-none tracking-tightest">Linkscape</h1>
+          <h1 className="font-display text-2xl font-medium leading-none tracking-tightest">Recallry</h1>
         </div>
         <button className="grid h-9 w-9 place-items-center border border-ink bg-paper-soft text-ink transition hover:bg-ink hover:text-paper" onClick={openDashboard} title="Open dashboard">
           <ExternalLink className="h-4 w-4" />

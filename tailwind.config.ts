@@ -31,7 +31,7 @@ export default {
         tightest: '-0.04em'
       },
       backgroundImage: {
-        'linkscape-radial':
+        'recallry-radial':
           'radial-gradient(circle at 20% 10%, rgba(102,231,255,0.22), transparent 28%), radial-gradient(circle at 86% 0%, rgba(255,111,145,0.18), transparent 24%), linear-gradient(135deg, #090b10 0%, #111827 48%, #10111d 100%)'
       }
     }

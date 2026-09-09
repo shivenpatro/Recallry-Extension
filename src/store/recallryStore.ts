@@ -29,10 +29,10 @@ import type { Collection, LinkCapture, LinkCard, SearchResult, VaultSettings } f
 import { DEFAULT_COLLECTION_ID } from '../shared/constants';
 
 function refreshContextMenus() {
-  void (globalThis as { chrome?: typeof chrome }).chrome?.runtime?.sendMessage?.({ type: 'LINKSCAPE_REFRESH_CONTEXT_MENUS' });
+  void (globalThis as { chrome?: typeof chrome }).chrome?.runtime?.sendMessage?.({ type: 'RECALLRY_REFRESH_CONTEXT_MENUS' });
 }
 
-interface LinkscapeState {
+interface RecallryState {
   collections: Collection[];
   links: LinkCard[];
   selectedCollectionId: string;
@@ -76,7 +76,7 @@ interface LinkscapeState {
   searchResults: () => SearchResult[];
 }
 
-export const useLinkscapeStore = create<LinkscapeState>((set, get) => ({
+export const useRecallryStore = create<RecallryState>((set, get) => ({
   collections: [],
   links: [],
   selectedCollectionId: DEFAULT_COLLECTION_ID,
@@ -92,7 +92,7 @@ export const useLinkscapeStore = create<LinkscapeState>((set, get) => ({
       const [collections, links, vault] = await Promise.all([listCollections(true), listLinks(), getVaultSettings()]);
       set({ collections, links, vault, selectedCollectionId: collections[0]?.id ?? DEFAULT_COLLECTION_ID, isLoading: false });
     } catch (error) {
-      set({ isLoading: false, error: error instanceof Error ? error.message : 'Linkscape could not open its local database' });
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Recallry could not open its local database' });
     }
   },
 

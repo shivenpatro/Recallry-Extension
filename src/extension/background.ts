@@ -6,10 +6,11 @@ import { captureActiveTab } from '../services/capture';
 import { isVaultUnlocked, lockVault, restoreVaultSession } from '../services/vault';
 import { ensureFreshAutomaticBackup } from '../services/backups';
 
-const QUICK_SAVE_MENU_ID = 'linkscape-save-page';
-const SAVE_TO_MENU_PREFIX = 'linkscape-save-to:';
-const OPEN_DASHBOARD_MENU_ID = 'linkscape-open-dashboard';
-const AUTOMATIC_BACKUP_ALARM = 'linkscape-automatic-backup';
+const QUICK_SAVE_MENU_ID = 'recallry-save-page';
+const SAVE_TO_MENU_PREFIX = 'recallry-save-to:';
+const OPEN_DASHBOARD_MENU_ID = 'recallry-open-dashboard';
+const AUTOMATIC_BACKUP_ALARM = 'recallry-automatic-backup';
+const LEGACY_AUTOMATIC_BACKUP_ALARM = 'linkscape-automatic-backup';
 
 chrome.runtime.onInstalled.addListener(() => {
   void initializeExtension();
@@ -47,31 +48,32 @@ chrome.commands.onCommand.addListener((command) => {
 });
 
 chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResponse) => {
-  if (message.type === 'LINKSCAPE_SAVE_ACTIVE_TAB') {
+  if (message.type === 'RECALLRY_SAVE_ACTIVE_TAB') {
     saveActiveTab()
       .then((link) => sendResponse({ ok: true, link }))
       .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Save failed' }));
     return true;
   }
 
-  if (message.type === 'LINKSCAPE_CAPTURE_PAGE') {
+  if (message.type === 'RECALLRY_CAPTURE_PAGE') {
     saveCapturedLink(DEFAULT_COLLECTION_ID, message.payload as LinkCapture)
       .then((link) => sendResponse({ ok: true, link }))
       .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : 'Capture failed' }));
     return true;
   }
 
-  if (message.type === 'LINKSCAPE_OPEN_DASHBOARD' || message.type === 'LINKSCAPE_OPEN_SEARCH') {
-    void openDashboard(message.type === 'LINKSCAPE_OPEN_SEARCH' ? '?search=1' : undefined);
+  if (message.type === 'RECALLRY_OPEN_DASHBOARD' || message.type === 'RECALLRY_OPEN_SEARCH') {
+    void openDashboard(message.type === 'RECALLRY_OPEN_SEARCH' ? '?search=1' : undefined);
   }
 
-  if (message.type === 'LINKSCAPE_LOCK_VAULT') void lockEverywhere();
-  if (message.type === 'LINKSCAPE_REFRESH_CONTEXT_MENUS') void rebuildContextMenus();
+  if (message.type === 'RECALLRY_LOCK_VAULT') void lockEverywhere();
+  if (message.type === 'RECALLRY_REFRESH_CONTEXT_MENUS') void rebuildContextMenus();
   return false;
 });
 
 async function initializeExtension() {
   await chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+  await chrome.alarms.clear(LEGACY_AUTOMATIC_BACKUP_ALARM);
   await bootstrapRepository();
   await restoreVaultSession();
   await rebuildContextMenus();
@@ -84,7 +86,7 @@ async function rebuildContextMenus() {
   await chrome.contextMenus.removeAll();
   chrome.contextMenus.create({
     id: QUICK_SAVE_MENU_ID,
-    title: 'Save to Linkscape',
+    title: 'Save to Recallry',
     contexts: ['page', 'link', 'selection']
   });
   for (const collection of collections.slice(0, 20)) {
@@ -97,7 +99,7 @@ async function rebuildContextMenus() {
   }
   chrome.contextMenus.create({
     id: OPEN_DASHBOARD_MENU_ID,
-    title: 'Open Linkscape Dashboard',
+    title: 'Open Recallry Dashboard',
     contexts: ['action']
   });
 }
@@ -110,7 +112,7 @@ async function saveActiveTab(collectionId = DEFAULT_COLLECTION_ID) {
 async function lockEverywhere() {
   await lockVault();
   await rebuildContextMenus();
-  await chrome.runtime.sendMessage({ type: 'LINKSCAPE_VAULT_LOCKED' }).catch(() => undefined);
+  await chrome.runtime.sendMessage({ type: 'RECALLRY_VAULT_LOCKED' }).catch(() => undefined);
 }
 
 async function openDashboard(suffix = '') {

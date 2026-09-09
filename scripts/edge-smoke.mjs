@@ -13,7 +13,7 @@ const browserExecutable = edgeCandidates.find(existsSync);
 if (!browserExecutable) throw new Error(`${requestedBrowser} was not found`);
 
 const extensionPath = resolve('dist');
-const profilePath = join(tmpdir(), `linkscape-browser-smoke-${globalThis.process.pid}`);
+const profilePath = join(tmpdir(), `recallry-browser-smoke-${globalThis.process.pid}`);
 const port = 9333 + Math.floor(Math.random() * 300);
 const browser = spawn(browserExecutable, [
   '--headless=new',
@@ -35,7 +35,7 @@ try {
     worker = targets.targetInfos.find((target) => target.type === 'service_worker' && target.url.startsWith('chrome-extension://') && target.url.endsWith('/background.js'));
     if (!worker) await delay(250);
   }
-  if (!worker) throw new Error('Linkscape service worker did not start');
+  if (!worker) throw new Error('Recallry service worker did not start');
   const extensionId = new globalThis.URL(worker.url).hostname;
   const workerSession = await cdp.send('Target.attachToTarget', { targetId: worker.targetId, flatten: true });
   await cdp.send('Runtime.enable', {}, workerSession.sessionId);
@@ -83,7 +83,7 @@ try {
   await cdp.send('Browser.close');
 } finally {
   if (!browser.killed) browser.kill();
-  if (profilePath.startsWith(tmpdir()) && profilePath.includes('linkscape-browser-smoke-')) await rm(profilePath, { recursive: true, force: true }).catch(() => undefined);
+  if (profilePath.startsWith(tmpdir()) && profilePath.includes('recallry-browser-smoke-')) await rm(profilePath, { recursive: true, force: true }).catch(() => undefined);
 }
 
 async function openTarget(cdp, url) {

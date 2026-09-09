@@ -1,6 +1,6 @@
-# Linkscape
+# Recallry
 
-Linkscape is a local-first Chrome and Edge extension for saving, organizing, searching, and protecting visual collections of websites. It combines fast capture with an offline personal archive and an optional encrypted Vault.
+Recallry is a local-first Chrome and Edge extension for saving, organizing, searching, and protecting visual collections of websites. It combines fast capture with an offline personal archive and an optional encrypted Vault.
 
 The project is release-candidate software. Core workflows, data safety, Vault boundaries, permission minimization, and production packaging are covered by automated tests and browser-level smoke checks. Store account setup, listing assets, policy declarations, and final human QA remain external release tasks.
 
@@ -68,7 +68,7 @@ Vault Mode is local encryption at rest, not an operating-system password manager
 - `alarms`: schedules a daily local recovery point.
 - Optional website access: requested only for the exact saved website origins included when the user starts an on-demand broken-link scan, and removable from Settings.
 
-Linkscape installs without persistent host access, has no always-running page content script, analytics SDK, or remote executable code. Fonts are packaged locally.
+Recallry installs without persistent host access, has no always-running page content script, analytics SDK, or remote executable code. Fonts are packaged locally.
 
 ## Development
 
@@ -105,8 +105,8 @@ Users can change global assignments from `chrome://extensions/shortcuts`.
 ## Publishing
 
 - Follow [STORE_SUBMISSION.md](STORE_SUBMISSION.md) for build, permission, disclosure, asset, and manual QA instructions.
-- Public privacy policy: https://shivenpatro.github.io/Linkscape-Extension/privacy/
-- Public product and support page: https://shivenpatro.github.io/Linkscape-Extension/
+- Public privacy policy: https://shivenpatro.github.io/Recallry-Extension/privacy/
+- Public product and support page: https://shivenpatro.github.io/Recallry-Extension/
 - One-time owner setup: enable GitHub Pages from the `main` branch's `/docs` folder before using those URLs in the Web Store dashboard.
 - Zip the contents inside `dist/`, not the repository or the enclosing `dist` folder.
 - Never commit or upload real backups, browser profiles, `.env` files, passwords, recovery answers, private keys, or signing material.

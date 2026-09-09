@@ -34,8 +34,8 @@ export function exportLinksAsHtml(links: LinkCard[]) {
     .join('\n');
   return `<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
-<TITLE>Linkscape Export</TITLE>
-<H1>Linkscape Export</H1>
+<TITLE>Recallry Export</TITLE>
+<H1>Recallry Export</H1>
 <DL><p>
 ${rows}
 </DL><p>`;
@@ -44,7 +44,7 @@ ${rows}
 export async function importBackup(json: string) {
   const parsed = JSON.parse(json) as BackupEnvelope;
   if (!parsed.version || !Array.isArray(parsed.collections) || !Array.isArray(parsed.links)) {
-    throw new Error('Invalid Linkscape backup');
+    throw new Error('Invalid Recallry backup');
   }
   await restoreBackup(parsed);
   return parsed;

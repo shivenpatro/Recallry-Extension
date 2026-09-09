@@ -6,7 +6,7 @@ import { Archive, Copy, GripVertical, Lock, MoreHorizontal, Palette, Pencil, Pin
 import type { Collection } from '../../shared/types';
 import { COLLECTION_THEMES } from '../../shared/constants';
 import { cn } from '../../shared/utils';
-import { useLinkscapeStore } from '../../store/linkscapeStore';
+import { useRecallryStore } from '../../store/recallryStore';
 import { isVaultUnlocked } from '../../services/vault';
 import { DEFAULT_COLLECTION_ID } from '../../shared/constants';
 
@@ -20,14 +20,14 @@ interface CollectionCardProps {
 
 export function CollectionCard({ collection, count, index, onOpen, onOpenVault }: CollectionCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: collection.id });
-  const updateCollection = useLinkscapeStore((state) => state.updateCollection);
-  const duplicateCollection = useLinkscapeStore((state) => state.duplicateCollection);
-  const archiveCollection = useLinkscapeStore((state) => state.archiveCollection);
-  const restoreCollection = useLinkscapeStore((state) => state.restoreCollection);
-  const setCollectionProtection = useLinkscapeStore((state) => state.setCollectionProtection);
-  const deleteCollection = useLinkscapeStore((state) => state.deleteCollection);
-  const restoreDeletedCollection = useLinkscapeStore((state) => state.restoreDeletedCollection);
-  const permanentlyDeleteCollection = useLinkscapeStore((state) => state.permanentlyDeleteCollection);
+  const updateCollection = useRecallryStore((state) => state.updateCollection);
+  const duplicateCollection = useRecallryStore((state) => state.duplicateCollection);
+  const archiveCollection = useRecallryStore((state) => state.archiveCollection);
+  const restoreCollection = useRecallryStore((state) => state.restoreCollection);
+  const setCollectionProtection = useRecallryStore((state) => state.setCollectionProtection);
+  const deleteCollection = useRecallryStore((state) => state.deleteCollection);
+  const restoreDeletedCollection = useRecallryStore((state) => state.restoreDeletedCollection);
+  const permanentlyDeleteCollection = useRecallryStore((state) => state.permanentlyDeleteCollection);
   const isTrashed = collection.status === 'trashed';
   const style = {
     transform: CSS.Transform.toString(transform),

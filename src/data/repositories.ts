@@ -408,7 +408,7 @@ export async function restoreBackup(backup: BackupEnvelope) {
 
 export function validateBackup(backup: BackupEnvelope) {
   if (!backup || backup.version !== 1 || !backup.vault || !Array.isArray(backup.collections) || !Array.isArray(backup.links) || !Array.isArray(backup.tags)) {
-    throw new Error('Invalid Linkscape backup');
+    throw new Error('Invalid Recallry backup');
   }
   if (backup.collections.length > 100_000 || backup.links.length > 1_000_000 || backup.tags.length > 100_000) {
     throw new Error('Backup exceeds supported limits');

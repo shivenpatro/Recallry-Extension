@@ -13,7 +13,7 @@ if (!edge) throw new Error('Microsoft Edge was not found');
 
 const extensionPath = resolve('dist');
 const outputPath = resolve('store-assets', 'screenshots');
-const profilePath = join(tmpdir(), `linkscape-store-assets-${globalThis.process.pid}`);
+const profilePath = join(tmpdir(), `recallry-store-assets-${globalThis.process.pid}`);
 const port = 9633 + Math.floor(Math.random() * 250);
 await mkdir(outputPath, { recursive: true });
 
@@ -76,7 +76,7 @@ try {
   await cdp.send('Browser.close');
 } finally {
   if (!browser.killed) browser.kill();
-  if (profilePath.startsWith(tmpdir()) && profilePath.includes('linkscape-store-assets-')) {
+  if (profilePath.startsWith(tmpdir()) && profilePath.includes('recallry-store-assets-')) {
     await rm(profilePath, { recursive: true, force: true }).catch(() => undefined);
   }
 }
@@ -88,7 +88,7 @@ async function findExtensionId(cdp) {
     if (worker) return new globalThis.URL(worker.url).hostname;
     await delay(200);
   }
-  throw new Error('Linkscape service worker did not start in Edge');
+  throw new Error('Recallry service worker did not start in Edge');
 }
 
 async function openTarget(cdp, url) {
@@ -126,6 +126,7 @@ async function seedShowcaseData(cdp, sessionId) {
   ];
 
   const expression = `(() => new Promise((resolve, reject) => {
+    // The extension keeps its original IndexedDB name to preserve existing installs across the rebrand.
     const request = indexedDB.open('linkscape');
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {

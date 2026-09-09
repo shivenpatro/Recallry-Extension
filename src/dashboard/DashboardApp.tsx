@@ -11,7 +11,7 @@ import {
 import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { motion } from 'framer-motion';
 import { Archive, Download, Grid2X2, Link2, Upload } from 'lucide-react';
-import { useLinkscapeStore } from '../store/linkscapeStore';
+import { useRecallryStore } from '../store/recallryStore';
 import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
 import { COLLECTION_THEMES } from '../shared/constants';
@@ -50,7 +50,7 @@ export function DashboardApp() {
     reorderLinks,
     reorderCollections,
     refresh
-  } = useLinkscapeStore();
+  } = useRecallryStore();
   const [viewMode, setViewMode] = useState<ViewMode>('collections');
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const sensors = useSensors(
@@ -78,11 +78,11 @@ export function DashboardApp() {
       }
       if (isCommand && event.shiftKey && event.key.toLowerCase() === 's') {
         event.preventDefault();
-        chrome?.runtime?.sendMessage?.({ type: 'LINKSCAPE_SAVE_ACTIVE_TAB' });
+        chrome?.runtime?.sendMessage?.({ type: 'RECALLRY_SAVE_ACTIVE_TAB' });
       }
       if (isCommand && event.key.toLowerCase() === 'l') {
         event.preventDefault();
-        chrome?.runtime?.sendMessage?.({ type: 'LINKSCAPE_LOCK_VAULT' });
+        chrome?.runtime?.sendMessage?.({ type: 'RECALLRY_LOCK_VAULT' });
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -92,8 +92,8 @@ export function DashboardApp() {
   useEffect(() => {
     const extensionApi = (globalThis as { chrome?: typeof chrome }).chrome;
     const listener = (message: { type?: string }) => {
-      if (message.type === 'LINKSCAPE_VAULT_LOCKED') {
-        useLinkscapeStore.getState().clearSelection();
+      if (message.type === 'RECALLRY_VAULT_LOCKED') {
+        useRecallryStore.getState().clearSelection();
         void lockVault().then(() => refresh());
       }
     };
@@ -113,11 +113,11 @@ export function DashboardApp() {
 
   useEffect(() => {
     const handleAutoLock = () => {
-      useLinkscapeStore.getState().clearSelection();
+      useRecallryStore.getState().clearSelection();
       void refresh();
     };
-    window.addEventListener('linkscape-vault-locked', handleAutoLock);
-    return () => window.removeEventListener('linkscape-vault-locked', handleAutoLock);
+    window.addEventListener('recallry-vault-locked', handleAutoLock);
+    return () => window.removeEventListener('recallry-vault-locked', handleAutoLock);
   }, [refresh]);
 
   const vaultUnlocked = isVaultUnlocked();
@@ -220,14 +220,14 @@ export function DashboardApp() {
 
   async function handleExport(format: 'json' | 'csv' | 'html') {
     if (format === 'json') {
-      downloadText('linkscape-backup.json', 'application/json', await exportAsJson());
+      downloadText('recallry-backup.json', 'application/json', await exportAsJson());
       return;
     }
     if (format === 'csv') {
-      downloadText('linkscape-links.csv', 'text/csv', exportLinksAsCsv(links));
+      downloadText('recallry-links.csv', 'text/csv', exportLinksAsCsv(links));
       return;
     }
-    downloadText('linkscape-bookmarks.html', 'text/html', exportLinksAsHtml(links));
+    downloadText('recallry-bookmarks.html', 'text/html', exportLinksAsHtml(links));
   }
 
   async function handleImport(file: File) {
@@ -241,7 +241,7 @@ export function DashboardApp() {
       if (!window.confirm(previewMessage)) return;
       await createAutomaticBackup('before-import');
       if (filename.endsWith('.json')) {
-        downloadText(`linkscape-before-restore-${new Date().toISOString().slice(0, 10)}.json`, 'application/json', await exportAsJson());
+        downloadText(`recallry-before-restore-${new Date().toISOString().slice(0, 10)}.json`, 'application/json', await exportAsJson());
         await importBackup(text);
       } else {
         if (filename.endsWith('.csv')) await importCsv(text, selectedCollectionId);
@@ -261,7 +261,7 @@ export function DashboardApp() {
           animate={{ opacity: [0.55, 1, 0.55] }}
           transition={{ duration: 1.8, repeat: Infinity }}
         >
-          Opening Linkscape
+          Opening Recallry
         </motion.div>
       </main>
     );
@@ -271,7 +271,7 @@ export function DashboardApp() {
     return (
       <main className="grid min-h-screen place-items-center bg-paper p-6 text-ink">
         <div className="paper-card max-w-lg p-8 shadow-editorial">
-          <h1 className="font-display text-3xl font-medium">Linkscape could not open</h1>
+          <h1 className="font-display text-3xl font-medium">Recallry could not open</h1>
           <p className="mt-3 text-sm leading-6 text-ink-soft">{error}</p>
           <Button className="mt-5" onClick={() => void init()}>Try again</Button>
         </div>
@@ -430,7 +430,7 @@ export function DashboardApp() {
                           {tag}
                         </button>
                       ))}
-                      <Button variant="ghost" onClick={() => useLinkscapeStore.getState().updateCollection(selectedCollection.id, { isFavorite: !selectedCollection.isFavorite })}>
+                      <Button variant="ghost" onClick={() => useRecallryStore.getState().updateCollection(selectedCollection.id, { isFavorite: !selectedCollection.isFavorite })}>
                         Favorite
                       </Button>
                     </div>

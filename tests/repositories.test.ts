@@ -75,7 +75,7 @@ describe('repository layer', () => {
     await bootstrapRepository();
     await createCollection({ title: 'Keep me' });
     await expect(restoreBackup({ version: 1, exportedAt: '', collections: [], links: [], tags: [], vault: null } as never))
-      .rejects.toThrow('Invalid Linkscape backup');
+      .rejects.toThrow('Invalid Recallry backup');
     await expect(db.collections.count()).resolves.toBe(4);
   });
 

@@ -1,8 +1,8 @@
 {
-  "name": "linkscape-extension",
+  "name": "recallry-extension",
   "version": "1.0.0",
   "private": true,
-  "description": "Linkscape - a premium local-first visual collection manager for Chrome and Edge.",
+  "description": "Recallry - a local-first visual web library for Chrome and Edge.",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",

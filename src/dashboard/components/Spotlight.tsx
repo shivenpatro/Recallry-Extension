@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { Archive, ExternalLink, Folder, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useLinkscapeStore } from '../../store/linkscapeStore';
+import { useRecallryStore } from '../../store/recallryStore';
 import { runGlobalSearch } from '../../services/search';
 import { isVaultUnlocked } from '../../services/vault';
 
@@ -19,11 +19,11 @@ export function Spotlight({ open, onClose, onOpenCollection }: SpotlightProps) {
   const [tagFilter, setTagFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('any');
   const [typeFilter, setTypeFilter] = useState('all');
-  const query = useLinkscapeStore((state) => state.searchQuery);
-  const collections = useLinkscapeStore((state) => state.collections);
-  const links = useLinkscapeStore((state) => state.links);
-  const setQuery = useLinkscapeStore((state) => state.setSearchQuery);
-  const setSelectedCollection = useLinkscapeStore((state) => state.setSelectedCollection);
+  const query = useRecallryStore((state) => state.searchQuery);
+  const collections = useRecallryStore((state) => state.collections);
+  const links = useRecallryStore((state) => state.links);
+  const setQuery = useRecallryStore((state) => state.setSearchQuery);
+  const setSelectedCollection = useRecallryStore((state) => state.setSelectedCollection);
   const accessibleLinks = useMemo(() => {
     const unlocked = isVaultUnlocked();
     const days = dateFilter === 'any' ? 0 : Number(dateFilter);

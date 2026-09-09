@@ -8,13 +8,14 @@ interface MetaRecord {
   value: unknown;
 }
 
-export class LinkscapeDatabase extends Dexie {
+export class RecallryDatabase extends Dexie {
   collections!: EntityTable<Collection, 'id'>;
   links!: EntityTable<LinkCard, 'id'>;
   tags!: EntityTable<Tag, 'id'>;
   meta!: EntityTable<MetaRecord, 'key'>;
 
   constructor() {
+    // This is a permanent storage identifier, not a visible brand. Renaming it would orphan existing user data.
     super('linkscape');
 
     this.version(1).stores({
@@ -49,7 +50,7 @@ export class LinkscapeDatabase extends Dexie {
   }
 }
 
-export const db = new LinkscapeDatabase();
+export const db = new RecallryDatabase();
 let seedPromise: Promise<void> | null = null;
 
 export async function ensureSeedData() {

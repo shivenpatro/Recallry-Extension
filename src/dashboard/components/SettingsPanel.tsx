@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Activity, Database, Download, History, Network, Shield, ShieldCheck, Upload } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { createAutomaticBackup, getBackupHealth, restoreAutomaticBackup, type AutomaticBackupRecord } from '../../services/backups';
-import { useLinkscapeStore } from '../../store/linkscapeStore';
+import { useRecallryStore } from '../../store/recallryStore';
 import { checkLinksHealth, removeLinkHealthPermissions, requestLinkHealthPermission, type LinkHealthSummary } from '../../services/linkHealth';
 
 interface SettingsPanelProps {
@@ -12,8 +12,8 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ onExport, onImport }: SettingsPanelProps) {
-  const refresh = useLinkscapeStore((state) => state.refresh);
-  const links = useLinkscapeStore((state) => state.links);
+  const refresh = useRecallryStore((state) => state.refresh);
+  const links = useRecallryStore((state) => state.links);
   const [backupStatus, setBackupStatus] = useState<'loading' | 'healthy' | 'stale' | 'missing'>('loading');
   const [latestBackup, setLatestBackup] = useState<AutomaticBackupRecord>();
   const [backupCount, setBackupCount] = useState(0);
@@ -47,7 +47,7 @@ export function SettingsPanel({ onExport, onImport }: SettingsPanelProps) {
   async function runLinkCheck() {
     const permittedOrigins = await requestLinkHealthPermission(links);
     if (permittedOrigins.length === 0) {
-      window.alert('Website access was not granted. Linkscape did not check any links.');
+      window.alert('Website access was not granted. Recallry did not check any links.');
       return;
     }
     setCheckingLinks(true);
@@ -80,7 +80,7 @@ export function SettingsPanel({ onExport, onImport }: SettingsPanelProps) {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Panel icon={<Database />} index="01" title="Local Data">
-          <p className="text-sm leading-6 text-ink-soft">Collections, cards, tags, and vault metadata live in IndexedDB. Linkscape works offline by default.</p>
+          <p className="text-sm leading-6 text-ink-soft">Collections, cards, tags, and vault metadata live in IndexedDB. Recallry works offline by default.</p>
           <div className="mt-5 flex flex-wrap gap-2">
             <Button onClick={() => void onExport('json')}>
               <Download className="h-3.5 w-3.5" />
@@ -96,7 +96,7 @@ export function SettingsPanel({ onExport, onImport }: SettingsPanelProps) {
         </Panel>
 
         <Panel icon={<Upload />} index="02" title="Import">
-          <p className="text-sm leading-6 text-ink-soft">Restore a Linkscape backup or import Chrome, Edge, Firefox, CSV, and bookmark HTML exports.</p>
+          <p className="text-sm leading-6 text-ink-soft">Restore a Recallry backup or import Chrome, Edge, Firefox, CSV, and bookmark HTML exports.</p>
           <label className="mt-5 inline-flex h-10 cursor-pointer items-center justify-center gap-2 bg-ink px-4 text-xs font-semibold uppercase tracking-wider text-paper transition hover:bg-vermillion">
             <Upload className="h-3.5 w-3.5" />
             Choose File
@@ -128,7 +128,7 @@ export function SettingsPanel({ onExport, onImport }: SettingsPanelProps) {
         </Panel>
 
         <Panel icon={<Activity />} index="04" title="Link Health">
-          <p className="text-sm leading-6 text-ink-soft">Check saved pages on demand. Linkscape requests access only to saved domains included in the scan and never reads browsing history.</p>
+          <p className="text-sm leading-6 text-ink-soft">Check saved pages on demand. Recallry requests access only to saved domains included in the scan and never reads browsing history.</p>
           {healthSummary ? <p className="mt-3 editorial-index text-[10px] uppercase tracking-wider text-ink-soft">{healthSummary.checked} checked · {healthSummary.healthy} healthy · {healthSummary.broken} broken · {healthSummary.unknown} unknown · {healthSummary.skipped} skipped</p> : null}
           <div className="mt-5 flex flex-wrap gap-2">
             <Button disabled={checkingLinks} onClick={() => void runLinkCheck()}>{checkingLinks ? 'Checking…' : 'Check saved links'}</Button>

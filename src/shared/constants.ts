@@ -1,4 +1,4 @@
-export const APP_NAME = 'Linkscape';
+export const APP_NAME = 'Recallry';
 
 export const DEFAULT_COLLECTION_ID = 'inbox';
 

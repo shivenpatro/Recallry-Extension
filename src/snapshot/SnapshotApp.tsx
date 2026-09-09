@@ -28,7 +28,7 @@ export function SnapshotApp() {
         <button className="grid h-10 w-10 place-items-center border border-ink bg-paper-soft transition hover:bg-ink hover:text-paper" onClick={() => globalThis.history.back()} title="Back"><ArrowLeft className="h-4 w-4" /></button>
         <div className="min-w-0 flex-1 px-4">
           <div className="editorial-index text-[10px] uppercase tracking-wider text-vermillion">Offline snapshot</div>
-          <h1 className="truncate font-display text-2xl font-semibold">{link?.title ?? 'Linkscape'}</h1>
+          <h1 className="truncate font-display text-2xl font-semibold">{link?.title ?? 'Recallry'}</h1>
         </div>
         {link ? <a className="grid h-10 w-10 place-items-center border border-ink bg-paper-soft transition hover:bg-ink hover:text-paper" href={link.url} target="_blank" rel="noreferrer" title="Open live page"><ExternalLink className="h-4 w-4" /></a> : null}
       </header>

@@ -4,11 +4,11 @@ import { motion } from 'framer-motion';
 import { KeyRound, Lock, ShieldCheck, Timer, Unlock } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { configureVaultRecovery, createVault, isVaultUnlocked, lockVault, resetVault, resetVaultPassword, unlockVault, updateVaultAutoLock } from '../../services/vault';
-import { useLinkscapeStore } from '../../store/linkscapeStore';
+import { useRecallryStore } from '../../store/recallryStore';
 
 export function VaultPanel() {
-  const vault = useLinkscapeStore((state) => state.vault);
-  const refresh = useLinkscapeStore((state) => state.refresh);
+  const vault = useRecallryStore((state) => state.vault);
+  const refresh = useRecallryStore((state) => state.refresh);
   const [password, setPassword] = useState('');
   const [autoLock, setAutoLock] = useState(15);
   const [recoveryQuestion, setRecoveryQuestion] = useState('');
@@ -31,7 +31,7 @@ export function VaultPanel() {
       setPassword('');
       setMessage('Vault ready');
       await refresh();
-      void chrome?.runtime?.sendMessage?.({ type: 'LINKSCAPE_REFRESH_CONTEXT_MENUS' });
+      void chrome?.runtime?.sendMessage?.({ type: 'RECALLRY_REFRESH_CONTEXT_MENUS' });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Vault action failed');
     }
@@ -41,7 +41,7 @@ export function VaultPanel() {
     await lockVault();
     setMessage('Vault locked');
     await refresh();
-    void chrome?.runtime?.sendMessage?.({ type: 'LINKSCAPE_REFRESH_CONTEXT_MENUS' });
+    void chrome?.runtime?.sendMessage?.({ type: 'RECALLRY_REFRESH_CONTEXT_MENUS' });
   }
 
   async function handleAutoLockBlur() {
@@ -63,7 +63,7 @@ export function VaultPanel() {
       setShowRecovery(false);
       setMessage('Password reset. Vault unlocked.');
       await refresh();
-      void chrome?.runtime?.sendMessage?.({ type: 'LINKSCAPE_REFRESH_CONTEXT_MENUS' });
+      void chrome?.runtime?.sendMessage?.({ type: 'RECALLRY_REFRESH_CONTEXT_MENUS' });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Password reset failed');
     }
@@ -93,7 +93,7 @@ export function VaultPanel() {
     const removedCount = await resetVault();
     setMessage(`Vault reset. ${removedCount} locked collection${removedCount === 1 ? '' : 's'} removed.`);
     await refresh();
-    void chrome?.runtime?.sendMessage?.({ type: 'LINKSCAPE_REFRESH_CONTEXT_MENUS' });
+    void chrome?.runtime?.sendMessage?.({ type: 'RECALLRY_REFRESH_CONTEXT_MENUS' });
   }
 
   return (

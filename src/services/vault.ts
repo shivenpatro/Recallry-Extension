@@ -9,7 +9,10 @@ const decoder = new TextDecoder();
 let activeVaultKey: CryptoKey | null = null;
 let autoLockTimer: ReturnType<typeof setTimeout> | null = null;
 let lastActivityRefresh = 0;
-const VAULT_SESSION_KEY = 'linkscapeVaultSession';
+const VAULT_SESSION_KEY = 'recallryVaultSession';
+const LEGACY_VAULT_SESSION_KEY = 'linkscapeVaultSession';
+// Keep this stored placeholder stable so previously encrypted records remain recognizable.
+const LEGACY_VAULT_URL = 'linkscape://vault';
 
 interface VaultSessionRecord {
   key: string;
@@ -33,16 +36,17 @@ async function persistVaultSession(key: CryptoKey, minutes: number) {
 }
 
 async function clearVaultSession() {
-  await sessionStorageApi()?.remove(VAULT_SESSION_KEY);
+  await sessionStorageApi()?.remove([VAULT_SESSION_KEY, LEGACY_VAULT_SESSION_KEY]);
 }
 
 export async function restoreVaultSession() {
   if (activeVaultKey) return true;
   const storage = sessionStorageApi();
   if (!storage) return false;
-  const stored = (await storage.get(VAULT_SESSION_KEY))[VAULT_SESSION_KEY] as VaultSessionRecord | undefined;
+  const sessionValues = await storage.get([VAULT_SESSION_KEY, LEGACY_VAULT_SESSION_KEY]);
+  const stored = (sessionValues[VAULT_SESSION_KEY] ?? sessionValues[LEGACY_VAULT_SESSION_KEY]) as VaultSessionRecord | undefined;
   if (!stored?.key || !Number.isFinite(stored.expiresAt) || stored.expiresAt <= Date.now()) {
-    await storage.remove(VAULT_SESSION_KEY);
+    await storage.remove([VAULT_SESSION_KEY, LEGACY_VAULT_SESSION_KEY]);
     return false;
   }
   activeVaultKey = await importVaultDataKey(base64ToBytes(stored.key));
@@ -311,7 +315,7 @@ export async function lockVault() {
   if (settings.enabled) {
     await setVaultSettings({ ...settings, lockedAt: nowIso(), updatedAt: nowIso() });
   }
-  if (typeof globalThis.dispatchEvent === 'function') globalThis.dispatchEvent(new Event('linkscape-vault-locked'));
+  if (typeof globalThis.dispatchEvent === 'function') globalThis.dispatchEvent(new Event('recallry-vault-locked'));
 }
 
 export async function resetVault() {
@@ -336,7 +340,7 @@ export async function resetVault() {
   await clearVaultSession();
   if (autoLockTimer) globalThis.clearTimeout(autoLockTimer);
   autoLockTimer = null;
-  if (typeof globalThis.dispatchEvent === 'function') globalThis.dispatchEvent(new Event('linkscape-vault-locked'));
+  if (typeof globalThis.dispatchEvent === 'function') globalThis.dispatchEvent(new Event('recallry-vault-locked'));
   return protectedCollections.length;
 }
 
@@ -390,7 +394,7 @@ export async function encryptLink(link: LinkCard): Promise<LinkCard> {
   return {
     ...link,
     title: 'Protected Link',
-    url: 'linkscape://vault',
+    url: LEGACY_VAULT_URL,
     notes: '',
     tags: [],
     labels: [],
@@ -440,8 +444,8 @@ export async function decryptLink(link: LinkCard): Promise<LinkCard> {
 
 const extensionApi = (globalThis as { chrome?: typeof chrome }).chrome;
 extensionApi?.storage?.onChanged?.addListener((changes, areaName) => {
-  if (areaName !== 'session' || !changes[VAULT_SESSION_KEY]) return;
-  const next = changes[VAULT_SESSION_KEY].newValue as VaultSessionRecord | undefined;
+  if (areaName !== 'session' || (!changes[VAULT_SESSION_KEY] && !changes[LEGACY_VAULT_SESSION_KEY])) return;
+  const next = (changes[VAULT_SESSION_KEY]?.newValue ?? changes[LEGACY_VAULT_SESSION_KEY]?.newValue) as VaultSessionRecord | undefined;
   if (next?.expiresAt && next.expiresAt > Date.now()) {
     if (activeVaultKey) scheduleAutoLock((next.expiresAt - Date.now()) / 60_000);
     return;
@@ -449,5 +453,5 @@ extensionApi?.storage?.onChanged?.addListener((changes, areaName) => {
   activeVaultKey = null;
   if (autoLockTimer) globalThis.clearTimeout(autoLockTimer);
   autoLockTimer = null;
-  if (typeof globalThis.dispatchEvent === 'function') globalThis.dispatchEvent(new Event('linkscape-vault-locked'));
+  if (typeof globalThis.dispatchEvent === 'function') globalThis.dispatchEvent(new Event('recallry-vault-locked'));
 });

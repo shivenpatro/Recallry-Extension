@@ -9,7 +9,7 @@ Please do not publish suspected security issues in a public GitHub issue. Contac
 - The affected browser and extension version.
 - Any suggested mitigation.
 
-Please do not include real passwords, recovery answers, private browsing data, or exported Linkscape backups in a report.
+Please do not include real passwords, recovery answers, private browsing data, or exported Recallry backups in a report.
 
 ## Scope
 

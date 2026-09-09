@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Linkscape - Visual Web Collections",
-  "short_name": "Linkscape",
+  "name": "Recallry - Visual Web Library",
+  "short_name": "Recallry",
   "description": "A premium, local-first visual collection manager for the modern web.",
   "version": "1.0.0",
   "minimum_chrome_version": "114",
   "action": {
-    "default_title": "Linkscape",
+    "default_title": "Recallry",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -34,21 +34,21 @@
         "default": "Ctrl+Shift+S",
         "mac": "Command+Shift+S"
       },
-      "description": "Save current page to Linkscape"
+      "description": "Save current page to Recallry"
     },
     "open-search": {
       "suggested_key": {
         "default": "Ctrl+Shift+K",
         "mac": "Command+Shift+K"
       },
-      "description": "Open Linkscape search"
+      "description": "Open Recallry search"
     },
     "lock-vault": {
       "suggested_key": {
         "default": "Ctrl+Shift+L",
         "mac": "Command+Shift+L"
       },
-      "description": "Lock Linkscape vault"
+      "description": "Lock Recallry vault"
     }
   }
 }

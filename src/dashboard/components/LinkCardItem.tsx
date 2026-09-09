@@ -6,7 +6,7 @@ import { Menu } from '@headlessui/react';
 import { Archive, BookOpen, Copy, ExternalLink, FolderInput, GripVertical, MoreHorizontal, Pencil, RotateCcw, Tags, Trash2 } from 'lucide-react';
 import type { LinkCard } from '../../shared/types';
 import { cn } from '../../shared/utils';
-import { useLinkscapeStore } from '../../store/linkscapeStore';
+import { useRecallryStore } from '../../store/recallryStore';
 import { isVaultUnlocked } from '../../services/vault';
 
 interface LinkCardItemProps {
@@ -17,14 +17,14 @@ interface LinkCardItemProps {
 export function LinkCardItem({ link, selected }: LinkCardItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: link.id });
   const [expanded, setExpanded] = useState(false);
-  const toggle = useLinkscapeStore((state) => state.toggleLinkSelection);
-  const updateLink = useLinkscapeStore((state) => state.updateLink);
-  const duplicateLink = useLinkscapeStore((state) => state.duplicateLink);
-  const deleteLink = useLinkscapeStore((state) => state.deleteLink);
-  const restoreLink = useLinkscapeStore((state) => state.restoreLink);
-  const permanentlyDeleteLink = useLinkscapeStore((state) => state.permanentlyDeleteLink);
-  const moveLink = useLinkscapeStore((state) => state.moveLink);
-  const collections = useLinkscapeStore((state) => state.collections);
+  const toggle = useRecallryStore((state) => state.toggleLinkSelection);
+  const updateLink = useRecallryStore((state) => state.updateLink);
+  const duplicateLink = useRecallryStore((state) => state.duplicateLink);
+  const deleteLink = useRecallryStore((state) => state.deleteLink);
+  const restoreLink = useRecallryStore((state) => state.restoreLink);
+  const permanentlyDeleteLink = useRecallryStore((state) => state.permanentlyDeleteLink);
+  const moveLink = useRecallryStore((state) => state.moveLink);
+  const collections = useRecallryStore((state) => state.collections);
   const style = { transform: CSS.Transform.toString(transform), transition };
 
   function openLink() {
@@ -98,7 +98,7 @@ export function LinkCardItem({ link, selected }: LinkCardItemProps) {
       draggable
       onDragStart={(event) => {
         const dragEvent = event as unknown as ReactDragEvent<HTMLElement>;
-        dragEvent.dataTransfer.setData('application/x-linkscape-link', link.id);
+        dragEvent.dataTransfer.setData('application/x-recallry-link', link.id);
         dragEvent.dataTransfer.effectAllowed = 'move';
       }}
       {...attributes}

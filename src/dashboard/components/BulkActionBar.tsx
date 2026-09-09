@@ -1,23 +1,23 @@
 import { useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Archive, RotateCcw, Tags, Trash2, X } from 'lucide-react';
-import { useLinkscapeStore } from '../../store/linkscapeStore';
+import { useRecallryStore } from '../../store/recallryStore';
 import { Button } from '../../components/Button';
 import { exportLinksAsCsv } from '../../services/importExport';
 import { downloadText } from '../../shared/utils';
 import { isVaultUnlocked } from '../../services/vault';
 
 export function BulkActionBar() {
-  const selected = useLinkscapeStore((state) => state.selectedLinkIds);
-  const allCollections = useLinkscapeStore((state) => state.collections);
-  const allLinks = useLinkscapeStore((state) => state.links);
-  const clearSelection = useLinkscapeStore((state) => state.clearSelection);
-  const deleteSelectedLinks = useLinkscapeStore((state) => state.deleteSelectedLinks);
-  const restoreSelectedLinks = useLinkscapeStore((state) => state.restoreSelectedLinks);
-  const permanentlyDeleteSelectedLinks = useLinkscapeStore((state) => state.permanentlyDeleteSelectedLinks);
-  const moveSelectedLinks = useLinkscapeStore((state) => state.moveSelectedLinks);
-  const archiveSelectedLinks = useLinkscapeStore((state) => state.archiveSelectedLinks);
-  const tagSelectedLinks = useLinkscapeStore((state) => state.tagSelectedLinks);
+  const selected = useRecallryStore((state) => state.selectedLinkIds);
+  const allCollections = useRecallryStore((state) => state.collections);
+  const allLinks = useRecallryStore((state) => state.links);
+  const clearSelection = useRecallryStore((state) => state.clearSelection);
+  const deleteSelectedLinks = useRecallryStore((state) => state.deleteSelectedLinks);
+  const restoreSelectedLinks = useRecallryStore((state) => state.restoreSelectedLinks);
+  const permanentlyDeleteSelectedLinks = useRecallryStore((state) => state.permanentlyDeleteSelectedLinks);
+  const moveSelectedLinks = useRecallryStore((state) => state.moveSelectedLinks);
+  const archiveSelectedLinks = useRecallryStore((state) => state.archiveSelectedLinks);
+  const tagSelectedLinks = useRecallryStore((state) => state.tagSelectedLinks);
   const collections = useMemo(() => allCollections.filter((collection) => collection.status === 'active' && (!collection.isVaultProtected || isVaultUnlocked())), [allCollections]);
   const selectedLinks = useMemo(() => allLinks.filter((link) => selected.includes(link.id)), [allLinks, selected]);
   const selectedAreTrashed = selectedLinks.length > 0 && selectedLinks.every((link) => Boolean(link.deletedAt));
@@ -29,7 +29,7 @@ export function BulkActionBar() {
   }
 
   function exportSelected() {
-    downloadText('linkscape-selected-links.csv', 'text/csv', exportLinksAsCsv(selectedLinks));
+    downloadText('recallry-selected-links.csv', 'text/csv', exportLinksAsCsv(selectedLinks));
   }
 
   return (
