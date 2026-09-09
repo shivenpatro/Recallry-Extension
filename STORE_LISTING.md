@@ -2,7 +2,7 @@
 
 ## Product Details
 
-**Name:** Recallry - Visual Web Collections
+**Name:** Recallry - Visual Web Library
 
 **Category:** Productivity
 
@@ -24,6 +24,8 @@ Optional link-health checks can identify missing pages. Recallry requests access
 
 Recallry contains no ads, analytics, tracking SDKs, or remote executable code. It does not sell browsing data or send your archive to the developer.
 
+No account is required. The current release does not automatically synchronize collections between devices; users move a library by exporting a JSON backup on one device and importing it on another.
+
 ## Single Purpose
 
 Recallry lets users explicitly save, organize, search, protect, import, and export website references as private local visual collections.
@@ -42,6 +44,7 @@ Recallry lets users explicitly save, organize, search, protect, import, and expo
 - **Website content:** Page title, URL, favicon, preview metadata, and optional reading snapshot are processed only when the user saves a page.
 - **Web history / browsing activity:** Saved URLs are stored because collecting those references is the extension's user-facing purpose. Recallry does not monitor general browsing history.
 - **User-generated content:** Collection names, descriptions, notes, tags, labels, imports, and settings are stored locally.
+- **Authentication information:** A Vault master password and optional recovery answer are processed locally to derive cryptographic keys. Raw secrets are not stored or transmitted; password-derived verifiers and wrapped encryption keys remain on the device.
 - **Data use:** Data is used only to provide Recallry's collection-management features. It is not sold, used for advertising, credit decisions, or unrelated profiling, and is not transferred to the developer.
 - **Remote code:** No. All executable code and fonts are packaged with the extension.
 

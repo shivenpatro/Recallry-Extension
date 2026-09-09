@@ -38,6 +38,7 @@
         <li>Page URL, title, domain, favicon, and available preview image for pages the user explicitly saves.</li>
         <li>Notes, tags, labels, collection names, and other content entered by the user.</li>
         <li>Save date, ordering, archive state, Trash state, optional script-free snapshots, local backups, imports, exports, and Vault settings.</li>
+        <li>A Vault master password and optional recovery answer while deriving local cryptographic keys. Recallry does not store those raw secrets; it stores password-derived verifiers and wrapped encryption keys locally.</li>
         <li>Link-health and HTTP response status when the user explicitly starts a scan.</li>
       </ul>
       <p>Recallry does not read or retain general browsing history. It processes only pages and saved domains involved in a user-requested Recallry action.</p>

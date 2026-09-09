@@ -22,6 +22,7 @@ The project is release-candidate software. Core workflows, data safety, Vault bo
 ## Current Boundaries
 
 - Public sharing links, cloud sync, billing, AI, collaboration, and mobile apps are future architecture only and must not be advertised as shipped.
+- There is no account or automatic cross-device synchronization. Installing Recallry on another computer installs the extension, not the IndexedDB library; use JSON export and import to move data between devices in the current release.
 - Smart collection rules have data support and a seeded example but no general-purpose rule-builder UI.
 - Reading snapshots intentionally remove scripts, forms, embedded media, external styles, and tracking-capable resources; they are safe readable copies rather than pixel-perfect page archives.
 - Image caching is best effort under the active tab permission. Cross-origin media that cannot be fetched safely remains a remote URL.

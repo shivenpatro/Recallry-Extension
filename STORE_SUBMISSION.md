@@ -1,5 +1,13 @@
 # Chrome Web Store Submission
 
+## Publisher Account Setup
+
+1. Register the publisher in the Chrome Web Store Developer Dashboard and pay Google's one-time developer registration fee.
+2. Enable 2-Step Verification on the owning Google Account.
+3. Set the public publisher name, verify a frequently monitored support email, and enable review/publication notifications.
+4. Complete the required Trader or Non-Trader declaration based on your legal circumstances. If classified as a Trader, review which verified contact details Google will display publicly.
+5. Keep the first release free. A physical business address becomes an account requirement if Recallry later offers purchases, paid features, or subscriptions.
+
 ## Release Build
 
 ```bash
@@ -33,7 +41,13 @@ The extension installs without persistent host permissions, has no remote execut
 
 ## Data-Use Disclosure
 
-Disclose website content and browsing activity because Recallry processes URLs, titles, and page metadata for the user-requested save workflow. Disclose user-generated content because notes, tags, labels, collection names, and imports are stored locally. State that these categories are used only for the extension's single purpose, are not sold, are not used for advertising or credit decisions, and are not transferred to the developer in the current release.
+In the Privacy tab, disclose:
+
+- Website content and browsing activity because Recallry processes URLs, titles, and page metadata for the user-requested save workflow.
+- User-generated content because notes, tags, labels, collection names, and imports are stored locally.
+- Authentication information because Vault passwords and recovery answers are processed locally to derive encryption keys. Raw secrets are not stored or transmitted.
+
+State that these categories are used only for the extension's single purpose, are not sold, are not used for advertising or credit decisions, and are not transferred to the developer in the current release. Certify compliance with the Chrome Web Store Limited Use requirements. Select **No** for remote code.
 
 Use these stable public URLs in the listing:
 
@@ -55,9 +69,19 @@ GitHub requires a repository owner to enable Pages before these URLs become publ
 
 Do not advertise cloud sync, public sharing links, collaboration, billing, AI categorization, or mobile apps until those systems ship.
 
+## Recommended First-Publication Sequence
+
+1. Upload the verified ZIP with `manifest.json` at its root.
+2. Complete Package, Store Listing, Privacy, Distribution, and support details. Reviewer instructions are optional because Recallry needs no credentials, but the prepared reviewer notes can shorten evaluation.
+3. Initially choose **Unlisted** visibility so the approved Chrome Web Store build can be installed from its direct URL without announcing it publicly.
+4. Submit for review using deferred publishing when available. All visibility levels receive the same policy review.
+5. After approval, install the Web Store build in a clean Chrome profile and complete every manual QA item below.
+6. Change visibility to **Public**, republish as required by the dashboard, and confirm the public listing before sharing it on LinkedIn.
+7. Do not create a second beta listing unless its name and description clearly identify it as a development or beta build.
+
 ## Manual Release QA
 
-1. Install the clean `dist/` build in a new Chrome profile.
+1. Install the clean `dist/` build in a new Chrome profile. Confirm Recallry opens without a login, creates the starter collections, and clearly presents its local-first behavior.
 2. Save normal pages from the popup, keyboard command, and context menu.
 3. Confirm restricted pages show a clear error and never create placeholder data.
 4. Exercise collection edit, duplicate, reorder, nesting, favorite, archive, protection, Trash, Restore, and permanent deletion.
@@ -70,6 +94,7 @@ Do not advertise cloud sync, public sharing links, collaboration, billing, AI ca
 11. Save an offline snapshot, disconnect the network, and verify its sandboxed reader opens without external requests.
 12. Start a link-health scan, review the optional permission prompt, and confirm denied access produces no scan.
 13. Remove link-health access from Settings, then confirm another scan asks only for the origins currently represented by saved links.
+14. Export a JSON backup from one clean browser profile, import it into a second clean profile, and verify collections, cards, nesting, settings, and Vault-protected records survive the manual device-transfer path.
 
 ## Versioning
 

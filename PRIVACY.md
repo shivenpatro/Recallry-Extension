@@ -18,6 +18,7 @@ When a user explicitly saves a page, Recallry may process:
 - An optional script-free reading snapshot created only when the user selects that option.
 - Link-health status and HTTP response status when the user explicitly starts a scan.
 - Import, export, local-backup, and Vault settings initiated by the user.
+- A Vault master password and optional recovery answer while deriving local cryptographic keys. Recallry does not store those raw secrets; it stores password-derived verifiers and wrapped encryption keys locally.
 
 Recallry does not read or retain the user's general browsing history. It processes only pages and saved domains involved in a user-requested Recallry action.
 
